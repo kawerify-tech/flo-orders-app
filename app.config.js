@@ -16,8 +16,8 @@ module.exports = {
       "**/*"
     ],
     android: {
-      package: "com.floorders",
-      versionCode: 1,
+      package: "com.floorders.floorders",
+      versionCode: 4,
       adaptiveIcon: {
         foregroundImage: "./assets/images/flo-logo.png",
         backgroundColor: "#ffffff"
@@ -26,7 +26,8 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.floorders",
-      buildNumber: "1",
+      buildNumber: "4",
+      googleServicesFile: "./app/GoogleService-Info.plist",
       deploymentTarget: "15.1",
       requireFullScreen: false,
       config: {

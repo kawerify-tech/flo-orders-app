@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>231184460855-ochvv4hef0ufdbp9fk7712s1s566mqkp.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.231184460855-ochvv4hef0ufdbp9fk7712s1s566mqkp</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>231184460855-2odqb7rvuh6fgos70j5kldd3lbtj0l6e.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyDI3J3fN4_Gi8-Gi9Oc9dyOxnCAKWcS4ho</string>
+	<key>GCM_SENDER_ID</key>
+	<string>231184460855</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.floorders</string>
+	<key>PROJECT_ID</key>
+	<string>flo-app-7de7d</string>
+	<key>STORAGE_BUCKET</key>
+	<string>flo-app-7de7d.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:231184460855:ios:566617d2b73222ba0623b2</string>
+	<key>DATABASE_URL</key>
+	<string>https://flo-app-7de7d-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>

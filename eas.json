@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 5.9.1",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -11,6 +11,12 @@
         "resourceClass": "m-medium",
         "simulator": true,
         "buildConfiguration": "Debug"
+      }
+    },
+    "internal": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     },
     "preview": {
@@ -30,24 +36,17 @@
         "buildConfiguration": "Release",
         "autoIncrement": "buildNumber",
         "simulator": false
-      },
-      "env": {
-        "NODE_ENV": "production"
       }
     },
     "production": {
       "distribution": "store",
       "android": {
-        "buildType": "app-bundle",
-        "autoIncrement": "versionCode"
+        "buildType": "app-bundle"
       },
       "ios": {
         "resourceClass": "m-medium",
         "buildConfiguration": "Release",
         "autoIncrement": "buildNumber"
-      },
-      "env": {
-        "NODE_ENV": "production"
       }
     },
     "testflight": {
@@ -56,29 +55,21 @@
         "resourceClass": "m-medium",
         "buildConfiguration": "Release",
         "autoIncrement": "buildNumber"
-      },
-      "env": {
-        "NODE_ENV": "production"
       }
     }
   },
   "submit": {
     "production": {
       "android": {
-        "serviceAccountKeyPath": "./google-service-account.json",
         "track": "production"
       },
       "ios": {
-        "appleId": "kawerifytech@gmail.com",
-        "ascAppId": "your-app-store-connect-app-id",
-        "appleTeamId": "your-apple-team-id"
+        "appleId": "kawerifytech@gmail.com"
       }
     },
     "testflight": {
       "ios": {
-        "appleId": "kawerifytech@gmail.com",
-        "ascAppId": "your-app-store-connect-app-id",
-        "appleTeamId": "your-apple-team-id"
+        "appleId": "kawerifytech@gmail.com"
       }
     }
   }
