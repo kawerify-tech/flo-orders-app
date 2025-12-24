@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download FLO Orders - iPhone & iPad App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #1d1d1f;
+            background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+            padding-top: 40px;
+        }
+
+        .app-icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 30px;
+            background: white;
+            border-radius: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #007AFF;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+            font-weight: 700;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+
+        .download-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 50px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .device-icons {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .device-icon {
+            font-size: 4rem;
+            opacity: 0.8;
+        }
+
+        .download-card h2 {
+            font-size: 2.2rem;
+            color: #1d1d1f;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .download-card p {
+            font-size: 1.1rem;
+            color: #86868b;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .download-methods {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .method-card {
+            background: #f5f5f7;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .method-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+
+        .method-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .instant { color: #34C759; }
+        .download { color: #007AFF; }
+        .testflight { color: #FF9500; }
+
+        .method-card h3 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: #1d1d1f;
+            font-weight: 600;
+        }
+
+        .method-card p {
+            font-size: 0.95rem;
+            color: #86868b;
+            margin-bottom: 25px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: #007AFF;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056CC;
+            transform: scale(1.05);
+        }
+
+        .btn-secondary {
+            background: #34C759;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #28A745;
+            transform: scale(1.05);
+        }
+
+        .btn-tertiary {
+            background: #FF9500;
+            color: white;
+        }
+
+        .btn-tertiary:hover {
+            background: #E6820E;
+            transform: scale(1.05);
+        }
+
+        .instructions {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+
+        .instructions h2 {
+            color: #1d1d1f;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f5f5f7;
+            border-radius: 12px;
+        }
+
+        .step-number {
+            background: #007AFF;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+
+        .step-content h4 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: #1d1d1f;
+            font-weight: 600;
+        }
+
+        .step-content p {
+            color: #86868b;
+            font-size: 0.95rem;
+        }
+
+        .features {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+
+        .features h2 {
+            text-align: center;
+            color: #1d1d1f;
+            margin-bottom: 40px;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+        }
+
+        .feature {
+            text-align: center;
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: #007AFF;
+        }
+
+        .feature h4 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: #1d1d1f;
+            font-weight: 600;
+        }
+
+        .feature p {
+            font-size: 0.9rem;
+            color: #86868b;
+        }
+
+        .footer {
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            margin-top: 60px;
+            padding-bottom: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .download-card,
+            .instructions,
+            .features {
+                padding: 30px 20px;
+            }
+            
+            .device-icons {
+                gap: 20px;
+            }
+            
+            .device-icon {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="app-icon">FLO</div>
+            <h1>FLO Orders</h1>
+            <p class="subtitle">Professional Fuel Management for iPhone & iPad</p>
+        </div>
+
+        <!-- Main Download Card -->
+        <div class="download-card">
+            <div class="device-icons">
+                <div class="device-icon">📱</div>
+                <div class="device-icon">📱</div>
+            </div>
+            <h2>Get FLO Orders for iOS</h2>
+            <p>Download our professional fuel management app designed exclusively for iPhone and iPad. Experience native iOS performance with beautiful design.</p>
+            
+            <div class="download-methods">
+                <!-- Instant Testing -->
+                <div class="method-card">
+                    <div class="method-icon instant">⚡</div>
+                    <h3>Try Instantly</h3>
+                    <p>Test the app immediately using Expo Go. No download required!</p>
+                    <a href="#" class="btn btn-secondary" id="expo-go-btn">
+                        Open in Expo Go
+                    </a>
+                </div>
+
+                <!-- Direct Download -->
+                <div class="method-card">
+                    <div class="method-icon download">📥</div>
+                    <h3>Download App</h3>
+                    <p>Download the .ipa file for direct installation on your iPhone/iPad.</p>
+                    <a href="#" class="btn btn-primary" id="download-ipa">
+                        Download IPA
+                    </a>
+                </div>
+
+                <!-- TestFlight -->
+                <div class="method-card">
+                    <div class="method-icon testflight">✈️</div>
+                    <h3>TestFlight Beta</h3>
+                    <p>Join our beta testing program through Apple's TestFlight.</p>
+                    <a href="#" class="btn btn-tertiary" id="testflight-btn">
+                        Join Beta
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Installation Instructions -->
+        <div class="instructions">
+            <h2>Installation Guide</h2>
+            
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h4>Choose Your Method</h4>
+                    <p>Select from instant testing with Expo Go, direct download, or TestFlight beta</p>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h4>For Direct Download</h4>
+                    <p>Download AltStore from altstore.io and use it to install the .ipa file on your device</p>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h4>Trust Developer</h4>
+                    <p>Go to Settings → General → VPN & Device Management → Trust the developer certificate</p>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <h4>Launch & Enjoy</h4>
+                    <p>Find FLO Orders on your home screen and start managing your fuel operations</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="features">
+            <h2>Built for iOS Excellence</h2>
+            <div class="features-grid">
+                <div class="feature">
+                    <div class="feature-icon">🍎</div>
+                    <h4>Native iOS Design</h4>
+                    <p>Follows Apple's Human Interface Guidelines</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📱</div>
+                    <h4>Universal App</h4>
+                    <p>Optimized for iPhone and iPad</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌙</div>
+                    <h4>Dark Mode</h4>
+                    <p>Automatic light and dark mode support</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h4>Fast Performance</h4>
+                    <p>Optimized for iOS devices</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <h4>Secure</h4>
+                    <p>iOS privacy and security compliant</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <h4>Real-time Data</h4>
+                    <p>Live fuel management and tracking</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>&copy; 2024 Kawerify Tech. All rights reserved.</p>
+            <p>FLO Orders - Exclusively designed for iPhone & iPad</p>
+        </div>
+    </div>
+
+    <script>
+        // Update these URLs with your actual links
+        const downloadLinks = {
+            ipa: 'path/to/your/flo-orders.ipa',
+            expoGo: 'exp://your-expo-url',
+            testflight: 'https://testflight.apple.com/join/your-code'
+        };
+
+        // Set up download links
+        document.getElementById('download-ipa').href = downloadLinks.ipa;
+        document.getElementById('expo-go-btn').href = downloadLinks.expoGo;
+        document.getElementById('testflight-btn').href = downloadLinks.testflight;
+
+        // Add click tracking
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                const method = this.id.replace('-btn', '').replace('-ipa', '');
+                console.log(`Download method selected: ${method}`);
+                
+                // Add your analytics tracking here
+                // gtag('event', 'download_attempt', { method: method });
+            });
+        });
+
+        // Detect iOS device and show appropriate messaging
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+            document.body.classList.add('ios-device');
+        }
+    </script>
+</body>
+</html>

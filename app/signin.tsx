@@ -1,0 +1,340 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image, Dimensions, Platform, Linking } from 'react-native';
+import { SafeAreaLayout } from '../components/SafeAreaLayout';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { addDoc, collection, query, where, getDocs, getDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../lib/firebaseConfig';
+import { colors, responsive, commonStyles } from '../constants/theme';
+import { useBreakpoint } from '../constants/breakpoints';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+
+// Eye icon for visible password
+const EyeIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+    <path d="M12 4C7.03 4 3 7.67 3 12s4.03 8 9 8c4.97 0 9-3.67 9-8s-4.03-8-9-8zm0 14c-3.87 0-7-2.93-7-6s3.13-6 7-6c3.87 0 7 2.93 7 6s-3.13 6-7 6zm2.5-6.5c0 .83-.67 1.5-1.5 1.5S11.5 12.83 11.5 12s.67-1.5 1.5-1.5S14.5 11.67 14.5 12z"/>
+  </svg>
+);
+
+const SignInScreen = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const breakpoint = useBreakpoint();
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const storedEmail = await AsyncStorage.getItem('lastLoginEmail');
+        if (storedEmail) setEmail(storedEmail);
+
+        const user = auth.currentUser;
+        if (user) {
+          const storedRole = await AsyncStorage.getItem('userRole');
+          if (storedRole === 'admin') router.replace('admin' as any);
+          else if (storedRole === 'attendant') router.replace('attendant' as any);
+          else if (storedRole === 'client') router.replace('clients' as any);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    init();
+  }, []);
+
+  const isTv = breakpoint === 'tv';
+  const isDesktop = breakpoint === 'desktop';
+  const isTablet = breakpoint.startsWith('ipad');
+
+  // Responsive values based on breakpoint
+  const logoSize = isTv ? 180 : isDesktop ? 120 : isTablet ? 100 : 70;
+  const titleFontSize = isTv ? 48 : isDesktop ? 36 : isTablet ? 28 : 20;
+  const inputFontSize = isTv ? 28 : isDesktop ? 22 : isTablet ? 18 : 14;
+  const buttonFontSize = isTv ? 28 : isDesktop ? 22 : isTablet ? 18 : 14;
+  const containerMaxWidth = isTv ? 900 : isDesktop ? 500 : '100%';
+  const buttonBottomSpace = isTv ? 120 : isDesktop ? 80 : isTablet ? 60 : 40;
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter both email and password.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const user = userCredential.user;
+      console.log('Login Success:', user);
+
+      await AsyncStorage.setItem('lastLoginEmail', email.trim());
+
+      try {
+        let ipAddress: string | null = null;
+        try {
+          const res = await fetch('https://api.ipify.org?format=json');
+          const json = await res.json();
+          if (json?.ip) ipAddress = String(json.ip);
+        } catch {
+          // ignore
+        }
+
+        const deviceInfo = {
+          platform: Platform.OS,
+          platformVersion: Platform.Version,
+          appOwnership: (Constants as any)?.appOwnership ?? null,
+          executionEnvironment: (Constants as any)?.executionEnvironment ?? null,
+          expoConfigName: (Constants as any)?.expoConfig?.name ?? null,
+        };
+
+        await addDoc(collection(db, 'loginAudits'), {
+          userId: user.uid,
+          email: (user.email || email.trim() || '').toLowerCase(),
+          ipAddress,
+          deviceInfo,
+          createdAt: serverTimestamp(),
+        });
+
+        await addDoc(collection(db, 'mail'), {
+          to: 'contact@kawerifytech.com',
+          message: {
+            subject: 'New Sign-in Alert - Flo Orders',
+            text: `A sign-in occurred for ${(user.email || email.trim() || '').toLowerCase()}\n\nIP: ${ipAddress || 'Unknown'}\nPlatform: ${deviceInfo.platform} (${String(deviceInfo.platformVersion)})\nEnvironment: ${deviceInfo.executionEnvironment || 'Unknown'}\n`,
+          },
+          createdAt: serverTimestamp(),
+        });
+      } catch {
+        // ignore
+      }
+
+      let role: string | null = null;
+
+      const adminRef = doc(db, 'admins', 'admin');
+      const adminSnap = await getDoc(adminRef);
+      if (adminSnap.exists() && adminSnap.data().email === email) {
+        role = 'admin';
+      }
+
+      if (!role) {
+        const attendantsQuery = query(collection(db, 'attendants'), where('email', '==', email));
+        const attendantsSnap = await getDocs(attendantsQuery);
+        if (!attendantsSnap.empty) {
+          role = 'attendant';
+        }
+      }
+
+      if (!role) {
+        const clientsQuery = query(collection(db, 'clients'), where('email', '==', email));
+        const clientsSnap = await getDocs(clientsQuery);
+        if (!clientsSnap.empty) {
+          role = 'client';
+        }
+      }
+
+      setLoading(false);
+
+      if (role === 'admin') {
+        await AsyncStorage.setItem('userRole', 'admin');
+        router.replace('admin' as any);
+      } else if (role === 'attendant') {
+        await AsyncStorage.setItem('userRole', 'attendant');
+        router.replace('attendant' as any);
+      } else if (role === 'client') {
+        await AsyncStorage.setItem('userRole', 'client');
+        router.replace('clients' as any);
+      } else {
+        Alert.alert('Error', 'Role not found. Contact support.');
+      }
+    } catch (error: any) {
+      setLoading(false);
+      console.error('Login Error:', error);
+      
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+        Alert.alert('Error', 'Wrong email or password. Please try again or contact our Admin.');
+      } else {
+        Alert.alert('Error', 'Something went wrong. Please check your internet connection and try again.');
+      }
+    }
+  };
+
+  return (
+    <SafeAreaLayout>
+      <View style={[styles.container, { maxWidth: containerMaxWidth }]}>
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('../assets/images/flo-logo.png')} 
+            style={[styles.logo, { width: logoSize, height: logoSize }]}
+            resizeMode="contain"
+          />
+        </View>
+
+        <View style={styles.formContainer}>
+          <Text style={[styles.title, { fontSize: titleFontSize }]}>Welcome Back</Text>
+          
+      <View style={styles.inputContainer}>
+            <MaterialIcons name="email" size={inputFontSize + 4} color={colors.textLight} style={styles.inputIcon} />
+        <TextInput
+          style={[styles.input, { fontSize: inputFontSize }]}
+              placeholder="Email"
+              placeholderTextColor={colors.textLight}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+            <MaterialIcons name="lock" size={inputFontSize + 4} color={colors.textLight} style={styles.inputIcon} />
+          <TextInput
+            style={[styles.input, { fontSize: inputFontSize }]}
+              placeholder="Password"
+              placeholderTextColor={colors.textLight}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+          />
+            <TouchableOpacity 
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.passwordToggle}
+            >
+              <MaterialIcons 
+                name={showPassword ? "visibility" : "visibility-off"} 
+                size={inputFontSize + 4} 
+                color={colors.textLight} 
+              />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={styles.forgotPassword}
+            onPress={() => Alert.alert('Forgot Password', 'Please contact the admin.')}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.signInButton, loading && styles.signInButtonDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.background} />
+            ) : (
+              <Text style={styles.signInButtonText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
+          <View style={styles.buttonBottomSpacer} />
+        </View>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            onPress={() => Linking.openURL('https://kawerifytech.com')}
+            accessibilityRole="link"
+          >
+            <Text style={styles.footerText}>Developed by Kawerify Tech</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </SafeAreaLayout>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    paddingHorizontal: responsive.spacing.lg,
+    maxWidth: responsive.isDesktop ? 500 : '100%',
+    alignSelf: 'center',
+    width: '100%',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginTop: responsive.spacing.xl,
+    marginBottom: responsive.spacing.lg,
+  },
+  logo: {
+    width: responsive.isMobile ? 80 : 100,
+    height: responsive.isMobile ? 80 : 100,
+  },
+  formContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: responsive.spacing.md,
+  },
+  title: {
+    fontSize: responsive.fontSize.lg,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: responsive.spacing.lg,
+    textAlign: 'center',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: responsive.borderRadius.md,
+    marginBottom: responsive.spacing.md,
+    paddingHorizontal: responsive.spacing.sm,
+    backgroundColor: colors.background,
+    ...commonStyles.shadow,
+  },
+  inputIcon: {
+    marginRight: responsive.spacing.sm,
+  },
+  input: {
+    flex: 1,
+    height: responsive.isMobile ? 45 : 50,
+    fontSize: responsive.fontSize.sm,
+    color: colors.text,
+  },
+  passwordToggle: {
+    padding: responsive.spacing.sm,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: responsive.spacing.lg,
+  },
+  forgotPasswordText: {
+    color: colors.primary,
+    fontSize: responsive.fontSize.sm,
+  },
+  signInButton: {
+    backgroundColor: colors.primary,
+    padding: responsive.spacing.md,
+    borderRadius: responsive.borderRadius.md,
+    alignItems: 'center',
+    ...commonStyles.shadow,
+  },
+  signInButtonDisabled: {
+    opacity: 0.7,
+  },
+  signInButtonText: {
+    color: colors.background,
+    fontSize: responsive.fontSize.md,
+    fontWeight: 'bold',
+  },
+  buttonBottomSpacer: {
+    height: responsive.spacing.xl * 2,
+  },
+  footer: {
+    padding: responsive.spacing.lg,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  footerText: {
+    color: colors.textLight,
+    fontSize: responsive.fontSize.xs,
+  },
+});
+
+export default SignInScreen;

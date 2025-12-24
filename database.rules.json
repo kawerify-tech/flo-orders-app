@@ -1,0 +1,60 @@
+{
+  "rules": {
+    "chats": {
+      "$chatId": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'attendant')",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'attendant')",
+        "messages": {
+          "$messageId": {
+            ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'attendant')",
+            ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'attendant')",
+            ".validate": "newData.hasChildren(['text', 'senderId', 'senderName', 'timestamp', 'status', 'type'])",
+            "text": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 1000"
+            },
+            "senderId": {
+              ".validate": "newData.val() === auth.uid"
+            },
+            "senderName": {
+              ".validate": "newData.isString() && newData.val().length > 0"
+            },
+            "timestamp": {
+              ".validate": "newData.val() <= now"
+            },
+            "status": {
+              ".validate": "newData.val() === 'sent' || newData.val() === 'delivered' || newData.val() === 'read'"
+            },
+            "type": {
+              ".validate": "newData.val() === 'text'"
+            }
+          }
+        },
+        "participants": {
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+            ".validate": "newData.val() === true"
+          }
+        }
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+        "role": {
+          ".validate": "newData.val() === 'admin' || newData.val() === 'attendant'"
+        },
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "lastSeen": {
+          ".validate": "newData.val() <= now"
+        },
+        "status": {
+          ".validate": "newData.val() === 'online' || newData.val() === 'offline'"
+        }
+      }
+    }
+  }
+} 

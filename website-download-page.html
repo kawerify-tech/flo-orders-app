@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download FLO Orders - Fuel Management App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #6A0DAD 0%, #8A2BE2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            background: white;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #6A0DAD;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .download-section {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .download-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .download-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-color: #6A0DAD;
+        }
+
+        .platform-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .android { color: #34A853; }
+        .ios { color: #007AFF; }
+        .web { color: #FF6B6B; }
+
+        .download-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .download-card p {
+            color: #666;
+            margin-bottom: 25px;
+        }
+
+        .download-btn {
+            display: inline-block;
+            background: #6A0DAD;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .download-btn:hover {
+            background: #8A2BE2;
+            transform: scale(1.05);
+        }
+
+        .download-btn.secondary {
+            background: #28a745;
+        }
+
+        .download-btn.secondary:hover {
+            background: #218838;
+        }
+
+        .features {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .features h2 {
+            text-align: center;
+            color: #6A0DAD;
+            margin-bottom: 30px;
+            font-size: 2rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .feature-item {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            color: #6A0DAD;
+            margin-bottom: 15px;
+        }
+
+        .instructions {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .instructions h2 {
+            color: #6A0DAD;
+            margin-bottom: 30px;
+            font-size: 2rem;
+        }
+
+        .instruction-tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 15px 25px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: #6A0DAD;
+            border-bottom-color: #6A0DAD;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .step-number {
+            background: #6A0DAD;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 50px;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .download-section,
+            .features,
+            .instructions {
+                padding: 20px;
+            }
+            
+            .instruction-tabs {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">FLO</div>
+            <h1>FLO Orders</h1>
+            <p>Professional Fuel Management System</p>
+        </div>
+
+        <!-- Download Section -->
+        <div class="download-section">
+            <div class="download-grid">
+                <!-- Android Download -->
+                <div class="download-card">
+                    <div class="platform-icon android">📱</div>
+                    <h3>Android</h3>
+                    <p>Download APK file for Android devices. Works on all Android phones and tablets.</p>
+                    <a href="#" class="download-btn" id="android-download">
+                        Download APK
+                    </a>
+                    <p style="font-size: 0.9rem; margin-top: 15px; color: #888;">
+                        Version 1.0.0 • 25 MB
+                    </p>
+                </div>
+
+                <!-- iOS Download -->
+                <div class="download-card">
+                    <div class="platform-icon ios">🍎</div>
+                    <h3>iPhone/iPad</h3>
+                    <p>Download IPA file for iOS devices. Compatible with iPhone and iPad.</p>
+                    <a href="#" class="download-btn" id="ios-download">
+                        Download IPA
+                    </a>
+                    <p style="font-size: 0.9rem; margin-top: 15px; color: #888;">
+                        Version 1.0.0 • 30 MB
+                    </p>
+                </div>
+
+                <!-- Web App -->
+                <div class="download-card">
+                    <div class="platform-icon web">🌐</div>
+                    <h3>Web App</h3>
+                    <p>Use directly in your browser or install as PWA on any device.</p>
+                    <a href="#" class="download-btn secondary" id="web-app">
+                        Open Web App
+                    </a>
+                    <p style="font-size: 0.9rem; margin-top: 15px; color: #888;">
+                        Works on all devices
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="features">
+            <h2>Key Features</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">⚡</div>
+                    <h4>Real-time Orders</h4>
+                    <p>Process fuel orders instantly with live updates</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">👥</div>
+                    <h4>Multi-Role System</h4>
+                    <p>Admin, Attendant, and Client access levels</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">💰</div>
+                    <h4>Balance Management</h4>
+                    <p>Track client balances and transactions</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📊</div>
+                    <h4>Analytics</h4>
+                    <p>Comprehensive reporting and insights</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">💬</div>
+                    <h4>Chat System</h4>
+                    <p>Built-in communication between users</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📱</div>
+                    <h4>Responsive Design</h4>
+                    <p>Works perfectly on all devices</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Installation Instructions -->
+        <div class="instructions">
+            <h2>Installation Instructions</h2>
+            
+            <div class="instruction-tabs">
+                <button class="tab-btn active" onclick="showTab('android')">Android</button>
+                <button class="tab-btn" onclick="showTab('ios')">iPhone/iPad</button>
+                <button class="tab-btn" onclick="showTab('web')">Web App</button>
+            </div>
+
+            <!-- Android Instructions -->
+            <div id="android-tab" class="tab-content active">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div>
+                        <strong>Enable Unknown Sources</strong><br>
+                        Go to Settings → Security → Enable "Install from Unknown Sources"
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div>
+                        <strong>Download APK</strong><br>
+                        Click the "Download APK" button above to download the app file
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div>
+                        <strong>Install</strong><br>
+                        Open the downloaded APK file and tap "Install"
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div>
+                        <strong>Launch</strong><br>
+                        Find "FLO Orders" on your home screen and open the app
+                    </div>
+                </div>
+            </div>
+
+            <!-- iOS Instructions -->
+            <div id="ios-tab" class="tab-content">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div>
+                        <strong>Download IPA</strong><br>
+                        Click the "Download IPA" button above to download the app file
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div>
+                        <strong>Install AltStore</strong><br>
+                        Download and install AltStore from altstore.io on your computer
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div>
+                        <strong>Sideload App</strong><br>
+                        Use AltStore to install the IPA file on your iPhone/iPad
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div>
+                        <strong>Trust Developer</strong><br>
+                        Go to Settings → General → VPN & Device Management → Trust the developer certificate
+                    </div>
+                </div>
+            </div>
+
+            <!-- Web App Instructions -->
+            <div id="web-tab" class="tab-content">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div>
+                        <strong>Open Web App</strong><br>
+                        Click the "Open Web App" button above to launch the app in your browser
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div>
+                        <strong>Install as PWA (Optional)</strong><br>
+                        On mobile: Tap Share → "Add to Home Screen"<br>
+                        On desktop: Click the install icon in the address bar
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div>
+                        <strong>Use Like Native App</strong><br>
+                        The web app works offline and behaves like a native mobile app
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>&copy; 2024 Kawerify Tech. All rights reserved.</p>
+            <p>FLO Orders - Professional Fuel Management System</p>
+        </div>
+    </div>
+
+    <script>
+        function showTab(platform) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(platform + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Update download links (replace with your actual download URLs)
+        document.getElementById('android-download').href = 'path/to/your/app.apk';
+        document.getElementById('ios-download').href = 'path/to/your/app.ipa';
+        document.getElementById('web-app').href = 'https://your-web-app-url.com';
+
+        // Add download tracking (optional)
+        document.querySelectorAll('.download-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                const platform = this.id.replace('-download', '').replace('-app', '');
+                console.log(`Download started: ${platform}`);
+                // Add your analytics tracking here
+            });
+        });
+    </script>
+</body>
+</html>
