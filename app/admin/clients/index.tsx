@@ -698,7 +698,7 @@ const ClientsScreen = () => {
               },
               {
                 text: "OK",
-                onPress: (password) => resolve(password || ""),
+                onPress: (password: string | undefined) => resolve(password || ""),
               },
             ],
             "secure-text"

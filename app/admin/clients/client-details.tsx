@@ -833,7 +833,7 @@ const ClientDetails = () => {
       console.log('PDF saved successfully');
 
       // Get the downloads directory path
-      const downloadsDir = `${FileSystem.documentDirectory}../Download/`;
+      const downloadsDir = `${(FileSystem as any).documentDirectory}../Download/`;
       const fileName = `client_report_${clientData?.id}.pdf`;
       const pdfPath = `${downloadsDir}${fileName}`;
 
@@ -841,9 +841,11 @@ const ClientDetails = () => {
       await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
 
       // Save the PDF
-      await FileSystem.writeAsStringAsync(pdfPath, Buffer.from(pdfBytes).toString('base64'), {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      await FileSystem.writeAsStringAsync(
+        pdfPath,
+        Buffer.from(pdfBytes).toString('base64'),
+        { encoding: (FileSystem as any).EncodingType?.Base64 } as any
+      );
 
       console.log('PDF saved to:', pdfPath);
 
@@ -1206,7 +1208,7 @@ const ClientDetails = () => {
       console.log('PDF saved successfully');
 
       // Get the downloads directory path
-      const downloadsDir = `${FileSystem.documentDirectory}../Download/`;
+      const downloadsDir = `${(FileSystem as any).documentDirectory}../Download/`;
       const fileName = `transaction_${transaction.id}.pdf`;
       const pdfPath = `${downloadsDir}${fileName}`;
 
@@ -1214,9 +1216,11 @@ const ClientDetails = () => {
       await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
 
       // Save the PDF
-      await FileSystem.writeAsStringAsync(pdfPath, Buffer.from(pdfBytes).toString('base64'), {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      await FileSystem.writeAsStringAsync(
+        pdfPath,
+        Buffer.from(pdfBytes).toString('base64'),
+        { encoding: (FileSystem as any).EncodingType?.Base64 } as any
+      );
 
       console.log('PDF saved to:', pdfPath);
 
@@ -1409,7 +1413,7 @@ const ClientDetails = () => {
       console.log('PDF saved successfully');
 
       // Get the downloads directory path
-      const downloadsDir = `${FileSystem.documentDirectory}../Download/`;
+      const downloadsDir = `${(FileSystem as any).documentDirectory}../Download/`;
       const fileName = `all_transactions_${clientData?.id}.pdf`;
       const pdfPath = `${downloadsDir}${fileName}`;
 
@@ -1417,9 +1421,11 @@ const ClientDetails = () => {
       await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
 
       // Save the PDF
-      await FileSystem.writeAsStringAsync(pdfPath, Buffer.from(pdfBytes).toString('base64'), {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      await FileSystem.writeAsStringAsync(
+        pdfPath,
+        Buffer.from(pdfBytes).toString('base64'),
+        { encoding: (FileSystem as any).EncodingType?.Base64 } as any
+      );
 
       console.log('PDF saved to:', pdfPath);
 
