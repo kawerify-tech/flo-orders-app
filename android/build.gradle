@@ -18,6 +18,10 @@ allprojects {
     google()
     mavenCentral()
     maven { url 'https://www.jitpack.io' }
+    // Repository for pdfbox-android (TomRoush's repository)
+    maven {
+      url 'https://repo1.maven.org/maven2'
+    }
   }
 }
 

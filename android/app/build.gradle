@@ -152,9 +152,28 @@ android {
     }
 }
 
+configurations.all {
+    resolutionStrategy {
+        // Force a compatible pdfbox-android version that exists
+        eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == 'com.tom_roush' && details.requested.name == 'pdfbox-android') {
+                // Use version 1.8.10.1 which is available on Maven Central
+                details.useVersion '1.8.10.1'
+                details.because 'Version 1.8.9.1 requested by react-native-pdf-lib does not exist'
+            }
+        }
+    }
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    
+    // Explicitly add pdfbox-android with a version that exists
+    // This ensures the dependency is available even if react-native-pdf-lib's version doesn't exist
+    implementation('com.tom_roush:pdfbox-android:1.8.10.1') {
+        // Don't force this version, just make it available
+    }
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
