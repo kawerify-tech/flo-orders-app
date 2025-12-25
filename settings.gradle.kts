@@ -44,7 +44,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven("https://jitpack.io") // Required for pdfbox-android
+        maven("https://jitpack.io") // JitPack repository for various packages
     }
 }
 

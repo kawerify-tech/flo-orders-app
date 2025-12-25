@@ -7,7 +7,7 @@ import { collection, query, where, orderBy, getDocs, doc, getDoc, updateDoc, add
 import { db } from '../../../lib/firebaseConfig';
 import { format } from 'date-fns';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { PDFDocument, StandardFonts } from 'react-native-pdf-lib';
+import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import Modal from 'react-native-modal';
@@ -654,210 +654,121 @@ const ClientDetails = () => {
         return;
       }
 
-      // For mobile platforms, use the original PDF generation code
-      const pdfDoc = await PDFDocument.create();
-      if (!pdfDoc) {
-        throw new Error('Failed to create PDF document');
-      }
-      console.log('PDF document created successfully');
+      // For mobile platforms, use expo-print (same HTML as web)
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { font-family: 'Helvetica', sans-serif; padding: 20px; }
+              h1 { color: #333; text-align: center; }
+              h2 { color: #666; margin-top: 30px; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+              th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+              th { background-color: #f2f2f2; }
+              .section { margin-bottom: 30px; }
+            </style>
+          </head>
+          <body>
+            <h1>Client Report: ${clientData?.name || 'N/A'}</h1>
+            
+            <div class="section">
+              <h2>Client Information</h2>
+              <table>
+                <tr><th>Name</th><td>${clientData?.name || 'N/A'}</td></tr>
+                <tr><th>Email</th><td>${clientData?.email || 'N/A'}</td></tr>
+                <tr><th>Phone</th><td>${clientData?.cellPhone || 'N/A'}</td></tr>
+                <tr><th>Current Balance</th><td>$${clientData?.balance?.toFixed(2) || '0.00'}</td></tr>
+                <tr><th>Status</th><td>${clientData?.status || 'N/A'}</td></tr>
+                <tr><th>Role</th><td>${clientData?.role || 'N/A'}</td></tr>
+                <tr><th>Account Created</th><td>${clientData?.createdAt ? formatTimestamp(clientData.createdAt) : 'N/A'}</td></tr>
+              </table>
+            </div>
 
-      let currentPage = pdfDoc.addPage([595.28, 841.89]); // A4 size in points
-      if (!currentPage) {
-        throw new Error('Failed to add page to PDF document');
-      }
-      console.log('Page added successfully');
+            <div class="section">
+              <h2>Transaction History</h2>
+              <table>
+                <tr>
+                  <th>Date</th>
+                  <th>Vehicle</th>
+                  <th>Fuel Type</th>
+                  <th>Litres</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Balance After</th>
+                </tr>
+                ${transactions.map(transaction => `
+                  <tr>
+                    <td>${formatTimestamp(transaction.timestamp)}</td>
+                    <td>${transaction.vehicle}</td>
+                    <td>${transaction.fuelType}</td>
+                    <td>${transaction.litres}</td>
+                    <td>$${transaction.amount.toFixed(2)}</td>
+                    <td>${transaction.status}</td>
+                    <td>$${transaction.metadata.clientBalance.toFixed(2)}</td>
+                  </tr>
+                  ${transaction.comment ? `<tr><td colspan="7"><strong>Comment:</strong> ${transaction.comment}</td></tr>` : ''}
+                `).join('')}
+              </table>
+            </div>
 
-      const { width, height } = currentPage.getSize();
-      const font = StandardFonts.Helvetica;
-      let y = height - 50;
+            <div class="section">
+              <h2>Topup History</h2>
+              <table>
+                <tr>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Message</th>
+                </tr>
+                ${topups.map(topup => `
+                  <tr>
+                    <td>${formatTimestamp(topup.timestamp)}</td>
+                    <td>$${topup.amount.toFixed(2)}</td>
+                    <td>${topup.type}</td>
+                    <td>${topup.status}</td>
+                    <td>${topup.message}</td>
+                  </tr>
+                `).join('')}
+              </table>
+            </div>
 
-      // Title
-      currentPage.drawText(`Client Report: ${clientData?.name}`, {
-        x: 50,
-        y,
-        size: 20,
-        font,
-        color: { r: 0, g: 0, b: 0 },
+            <div class="section">
+              <h2>Notifications</h2>
+              <table>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Message</th>
+                  <th>Status</th>
+                </tr>
+                ${notifications.map(notification => `
+                  <tr>
+                    <td>${formatTimestamp(notification.timestamp)}</td>
+                    <td>${notification.type}</td>
+                    <td>${notification.message}</td>
+                    <td>${notification.status}</td>
+                  </tr>
+                `).join('')}
+              </table>
+            </div>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false
       });
 
-      // Client Information
-      y -= 50;
-      currentPage.drawText('Client Information:', {
-        x: 50,
-        y,
-        size: 14,
-        font,
-        color: { r: 0, g: 0, b: 0 },
-      });
-
-      y -= 30;
-      const clientInfo = [
-        `Name: ${clientData?.name || 'N/A'}`,
-        `Email: ${clientData?.email || 'N/A'}`,
-        `Phone: ${clientData?.cellPhone || 'N/A'}`,
-        `Current Balance: $${clientData?.balance?.toFixed(2) || '0.00'}`,
-        `Status: ${clientData?.status || 'N/A'}`,
-        `Role: ${clientData?.role || 'N/A'}`,
-        `Account Created: ${clientData?.createdAt ? formatTimestamp(clientData.createdAt) : 'N/A'}`,
-      ];
-
-      clientInfo.forEach(info => {
-        currentPage.drawText(info, {
-          x: 50,
-          y,
-          size: 12,
-          font,
-          color: { r: 0, g: 0, b: 0 },
-        });
-        y -= 20;
-      });
-
-      // Transactions
-      y -= 30;
-      currentPage.drawText('Transaction History:', {
-        x: 50,
-        y,
-        size: 14,
-        font,
-        color: { r: 0, g: 0, b: 0 },
-      });
-
-      y -= 20;
-      transactions.forEach(transaction => {
-        const transactionText = [
-          `Date: ${formatTimestamp(transaction.timestamp)}`,
-          `Vehicle: ${transaction.vehicle}`,
-          `Fuel Type: ${transaction.fuelType}`,
-          `Litres: ${transaction.litres}`,
-          `Amount: $${transaction.amount.toFixed(2)}`,
-          `Status: ${transaction.status}`,
-          `Balance After: $${transaction.metadata.clientBalance.toFixed(2)}`,
-          '----------------------------------------',
-        ];
-
-        if (transaction.comment) {
-          transactionText.splice(6, 0, `Comment: ${transaction.comment}`);
-        }
-
-        transactionText.forEach(text => {
-          if (y < 50) {
-            currentPage = pdfDoc.addPage([595.28, 841.89]);
-            y = height - 50;
-          }
-          currentPage.drawText(text, {
-            x: 50,
-            y,
-            size: 10,
-            font,
-            color: { r: 0, g: 0, b: 0 },
-          });
-          y -= 15;
-        });
-      });
-
-      // Topups
-      y -= 30;
-      currentPage.drawText('Topup History:', {
-        x: 50,
-        y,
-        size: 14,
-        font,
-        color: { r: 0, g: 0, b: 0 },
-      });
-
-      y -= 20;
-      topups.forEach(topup => {
-        const topupText = [
-          `Date: ${formatTimestamp(topup.timestamp)}`,
-          `Amount: $${topup.amount.toFixed(2)}`,
-          `Type: ${topup.type}`,
-          `Status: ${topup.status}`,
-          `Message: ${topup.message}`,
-          '----------------------------------------',
-        ];
-
-        topupText.forEach(text => {
-          if (y < 50) {
-            currentPage = pdfDoc.addPage([595.28, 841.89]);
-            y = height - 50;
-          }
-          currentPage.drawText(text, {
-            x: 50,
-            y,
-            size: 10,
-            font,
-            color: { r: 0, g: 0, b: 0 },
-          });
-          y -= 15;
-        });
-      });
-
-      // Notifications
-      y -= 30;
-      currentPage.drawText('Notifications:', {
-        x: 50,
-        y,
-        size: 14,
-        font,
-        color: { r: 0, g: 0, b: 0 },
-      });
-
-      y -= 20;
-      notifications.forEach(notification => {
-        const notificationText = [
-          `Date: ${formatTimestamp(notification.timestamp)}`,
-          `Type: ${notification.type}`,
-          `Message: ${notification.message}`,
-          `Status: ${notification.status}`,
-          '----------------------------------------',
-        ];
-
-        notificationText.forEach(text => {
-          if (y < 50) {
-            currentPage = pdfDoc.addPage([595.28, 841.89]);
-            y = height - 50;
-          }
-          currentPage.drawText(text, {
-            x: 50,
-            y,
-            size: 10,
-            font,
-            color: { r: 0, g: 0, b: 0 },
-          });
-          y -= 15;
-        });
-      });
-
-      // Save the PDF
-      const pdfBytes = await pdfDoc.save();
-      console.log('PDF saved successfully');
-
-      // Get the downloads directory path
-      const downloadsDir = `${(FileSystem as any).documentDirectory}../Download/`;
-      const fileName = `client_report_${clientData?.id}.pdf`;
-      const pdfPath = `${downloadsDir}${fileName}`;
-
-      // Ensure the downloads directory exists
-      await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
-
-      // Save the PDF
-      await FileSystem.writeAsStringAsync(
-        pdfPath,
-        Buffer.from(pdfBytes).toString('base64'),
-        { encoding: (FileSystem as any).EncodingType?.Base64 } as any
-      );
-
-      console.log('PDF saved to:', pdfPath);
-
-      // Share the PDF
-      await Sharing.shareAsync(pdfPath, {
-          mimeType: 'application/pdf',
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
         dialogTitle: `Client Report - ${clientData?.name}`,
         UTI: 'public.pdf',
-        });
+      });
 
-      // Show success message
-      Alert.alert('Success', `PDF saved successfully`);
+      Alert.alert('Success', 'PDF generated and shared successfully');
     } catch (error) {
       console.error('Error generating PDF:', error);
       Alert.alert('Error', 'Failed to generate PDF report');
@@ -1113,126 +1024,58 @@ const ClientDetails = () => {
         return;
       }
 
-      // For mobile platforms, use the original PDF generation code
-      const pdfDoc = await PDFDocument.create();
-      if (!pdfDoc) {
-        throw new Error('Failed to create PDF document');
-      }
-      console.log('PDF document created successfully');
+      // For mobile platforms, use expo-print
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { font-family: 'Helvetica', sans-serif; padding: 20px; }
+              h1 { color: #333; text-align: center; }
+              h2 { color: #666; margin-top: 30px; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+              th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+              th { background-color: #f2f2f2; }
+            </style>
+          </head>
+          <body>
+            <h1>Transaction Receipt</h1>
+            
+            <h2>Client Information</h2>
+            <table>
+              <tr><th>Name</th><td>${clientData?.name || 'N/A'}</td></tr>
+              <tr><th>Email</th><td>${clientData?.email || 'N/A'}</td></tr>
+              <tr><th>Phone</th><td>${clientData?.cellPhone || 'N/A'}</td></tr>
+            </table>
 
-      const page = pdfDoc.addPage([595.28, 841.89]); // A4 size in points
-      if (!page) {
-        throw new Error('Failed to add page to PDF document');
-      }
-      console.log('Page added successfully');
+            <h2>Transaction Details</h2>
+            <table>
+              <tr><th>Date</th><td>${formatTimestamp(transaction.timestamp)}</td></tr>
+              <tr><th>Vehicle</th><td>${transaction.vehicle}</td></tr>
+              <tr><th>Fuel Type</th><td>${transaction.fuelType}</td></tr>
+              <tr><th>Litres</th><td>${transaction.litres}</td></tr>
+              <tr><th>Amount</th><td>$${transaction.amount.toFixed(2)}</td></tr>
+              <tr><th>Status</th><td>${transaction.status}</td></tr>
+              <tr><th>Attendant</th><td>${transaction.attendantName}</td></tr>
+              <tr><th>Balance After</th><td>$${transaction.metadata.clientBalance.toFixed(2)}</td></tr>
+              ${transaction.comment ? `<tr><th>Comment</th><td>${transaction.comment}</td></tr>` : ''}
+            </table>
+          </body>
+        </html>
+      `;
 
-      const { width, height } = page.getSize();
-      const font = StandardFonts.Helvetica;
-
-      // Title
-      page.drawText(`Transaction Receipt`, {
-        x: 50,
-        y: height - 50,
-        size: 20,
-        font,
-        color: { r: 0, g: 0, b: 0 },
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false
       });
 
-      // Client Information
-      let y = height - 100;
-      page.drawText('Client Information:', {
-        x: 50,
-        y,
-        size: 14,
-        font,
-        color: { r: 0, g: 0, b: 0 },
-      });
-
-      y -= 30;
-      const clientInfo = [
-        `Name: ${clientData?.name || 'N/A'}`,
-        `Email: ${clientData?.email || 'N/A'}`,
-        `Phone: ${clientData?.cellPhone || 'N/A'}`,
-      ];
-
-      clientInfo.forEach(info => {
-        page.drawText(info, {
-          x: 50,
-          y,
-          size: 12,
-          font,
-          color: { r: 0, g: 0, b: 0 },
-        });
-        y -= 20;
-      });
-
-      // Transaction Details
-      y -= 30;
-      page.drawText('Transaction Details:', {
-        x: 50,
-        y,
-        size: 14,
-        font,
-        color: { r: 0, g: 0, b: 0 },
-      });
-
-      y -= 30;
-      const transactionDetails = [
-        `Date: ${formatTimestamp(transaction.timestamp)}`,
-        `Vehicle: ${transaction.vehicle}`,
-        `Fuel Type: ${transaction.fuelType}`,
-        `Litres: ${transaction.litres}`,
-        `Amount: $${transaction.amount.toFixed(2)}`,
-        `Status: ${transaction.status}`,
-        `Attendant: ${transaction.attendantName}`,
-        `Balance After: $${transaction.metadata.clientBalance.toFixed(2)}`,
-      ];
-
-      if (transaction.comment) {
-        transactionDetails.push(`Comment: ${transaction.comment}`);
-      }
-
-      transactionDetails.forEach(detail => {
-        page.drawText(detail, {
-          x: 50,
-          y,
-          size: 12,
-          font,
-          color: { r: 0, g: 0, b: 0 },
-        });
-        y -= 20;
-      });
-
-      // Save the PDF
-      const pdfBytes = await pdfDoc.save();
-      console.log('PDF saved successfully');
-
-      // Get the downloads directory path
-      const downloadsDir = `${(FileSystem as any).documentDirectory}../Download/`;
-      const fileName = `transaction_${transaction.id}.pdf`;
-      const pdfPath = `${downloadsDir}${fileName}`;
-
-      // Ensure the downloads directory exists
-      await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
-
-      // Save the PDF
-      await FileSystem.writeAsStringAsync(
-        pdfPath,
-        Buffer.from(pdfBytes).toString('base64'),
-        { encoding: (FileSystem as any).EncodingType?.Base64 } as any
-      );
-
-      console.log('PDF saved to:', pdfPath);
-
-      // Share the PDF
-      await Sharing.shareAsync(pdfPath, {
+      await Sharing.shareAsync(uri, {
         mimeType: 'application/pdf',
         dialogTitle: `Transaction Receipt - ${transaction.vehicle}`,
         UTI: 'public.pdf',
       });
 
-      // Show success message
-      Alert.alert('Success', `PDF saved successfully`);
+      Alert.alert('Success', 'PDF generated and shared successfully');
     } catch (error) {
       console.error('Error generating transaction PDF:', error);
       Alert.alert('Error', 'Failed to generate transaction PDF');
@@ -1310,134 +1153,71 @@ const ClientDetails = () => {
         return;
       }
 
-      // For mobile platforms, use the original PDF generation code
-      const pdfDoc = await PDFDocument.create();
-      if (!pdfDoc) {
-        throw new Error('Failed to create PDF document');
-      }
-      console.log('PDF document created successfully');
+      // For mobile platforms, use expo-print (same HTML as web)
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { font-family: 'Helvetica', sans-serif; padding: 20px; }
+              h1 { color: #333; text-align: center; }
+              h2 { color: #666; margin-top: 30px; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+              th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+              th { background-color: #f2f2f2; }
+            </style>
+          </head>
+          <body>
+            <h1>All Transactions Report - ${clientData?.name || 'N/A'}</h1>
+            
+            <h2>Client Information</h2>
+            <table>
+              <tr><th>Name</th><td>${clientData?.name || 'N/A'}</td></tr>
+              <tr><th>Email</th><td>${clientData?.email || 'N/A'}</td></tr>
+              <tr><th>Phone</th><td>${clientData?.cellPhone || 'N/A'}</td></tr>
+              <tr><th>Current Balance</th><td>$${clientData?.balance?.toFixed(2) || '0.00'}</td></tr>
+            </table>
 
-      let currentPage = pdfDoc.addPage([595.28, 841.89]); // A4 size in points
-      if (!currentPage) {
-        throw new Error('Failed to add page to PDF document');
-      }
-      console.log('Page added successfully');
+            <h2>Transaction History</h2>
+            <table>
+              <tr>
+                <th>Date</th>
+                <th>Vehicle</th>
+                <th>Fuel Type</th>
+                <th>Litres</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Balance After</th>
+              </tr>
+              ${transactions.map(transaction => `
+                <tr>
+                  <td>${formatTimestamp(transaction.timestamp)}</td>
+                  <td>${transaction.vehicle}</td>
+                  <td>${transaction.fuelType}</td>
+                  <td>${transaction.litres}</td>
+                  <td>$${transaction.amount.toFixed(2)}</td>
+                  <td>${transaction.status}</td>
+                  <td>$${transaction.metadata.clientBalance.toFixed(2)}</td>
+                </tr>
+                ${transaction.comment ? `<tr><td colspan="7"><strong>Comment:</strong> ${transaction.comment}</td></tr>` : ''}
+              `).join('')}
+            </table>
+          </body>
+        </html>
+      `;
 
-      const { width, height } = currentPage.getSize();
-      const font = StandardFonts.Helvetica;
-      let y = height - 50;
-
-      // Title
-      currentPage.drawText(`All Transactions Report - ${clientData?.name}`, {
-        x: 50,
-        y,
-        size: 20,
-        font,
-        color: { r: 0, g: 0, b: 0 },
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false
       });
 
-      // Client Information
-      y -= 50;
-      currentPage.drawText('Client Information:', {
-        x: 50,
-        y,
-        size: 14,
-        font,
-        color: { r: 0, g: 0, b: 0 },
-      });
-
-      y -= 30;
-      const clientInfo = [
-        `Name: ${clientData?.name || 'N/A'}`,
-        `Email: ${clientData?.email || 'N/A'}`,
-        `Phone: ${clientData?.cellPhone || 'N/A'}`,
-        `Current Balance: $${clientData?.balance?.toFixed(2) || '0.00'}`,
-      ];
-
-      clientInfo.forEach(info => {
-        currentPage.drawText(info, {
-          x: 50,
-          y,
-          size: 12,
-          font,
-          color: { r: 0, g: 0, b: 0 },
-        });
-        y -= 20;
-      });
-
-      // Transactions
-      y -= 30;
-      currentPage.drawText('Transaction History:', {
-        x: 50,
-        y,
-        size: 14,
-        font,
-        color: { r: 0, g: 0, b: 0 },
-      });
-
-      y -= 20;
-      transactions.forEach(transaction => {
-        const transactionText = [
-          `Date: ${formatTimestamp(transaction.timestamp)}`,
-          `Vehicle: ${transaction.vehicle}`,
-          `Fuel Type: ${transaction.fuelType}`,
-          `Litres: ${transaction.litres}`,
-          `Amount: $${transaction.amount.toFixed(2)}`,
-          `Status: ${transaction.status}`,
-          `Balance After: $${transaction.metadata.clientBalance.toFixed(2)}`,
-          '----------------------------------------',
-        ];
-
-        if (transaction.comment) {
-          transactionText.splice(6, 0, `Comment: ${transaction.comment}`);
-        }
-
-        transactionText.forEach(text => {
-          if (y < 50) {
-            currentPage = pdfDoc.addPage([595.28, 841.89]);
-            y = height - 50;
-          }
-          currentPage.drawText(text, {
-            x: 50,
-            y,
-            size: 10,
-            font,
-            color: { r: 0, g: 0, b: 0 },
-          });
-          y -= 15;
-        });
-      });
-
-      // Save the PDF
-      const pdfBytes = await pdfDoc.save();
-      console.log('PDF saved successfully');
-
-      // Get the downloads directory path
-      const downloadsDir = `${(FileSystem as any).documentDirectory}../Download/`;
-      const fileName = `all_transactions_${clientData?.id}.pdf`;
-      const pdfPath = `${downloadsDir}${fileName}`;
-
-      // Ensure the downloads directory exists
-      await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
-
-      // Save the PDF
-      await FileSystem.writeAsStringAsync(
-        pdfPath,
-        Buffer.from(pdfBytes).toString('base64'),
-        { encoding: (FileSystem as any).EncodingType?.Base64 } as any
-      );
-
-      console.log('PDF saved to:', pdfPath);
-
-      // Share the PDF
-      await Sharing.shareAsync(pdfPath, {
+      await Sharing.shareAsync(uri, {
         mimeType: 'application/pdf',
-        dialogTitle: `All Transactions - ${clientData?.name}`,
+        dialogTitle: `All Transactions Report - ${clientData?.name}`,
         UTI: 'public.pdf',
       });
 
-      // Show success message
-      Alert.alert('Success', `PDF saved successfully`);
+      Alert.alert('Success', 'PDF generated and shared successfully');
     } catch (error) {
       console.error('Error generating all transactions PDF:', error);
       Alert.alert('Error', 'Failed to generate transactions PDF');

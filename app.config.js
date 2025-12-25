@@ -113,7 +113,8 @@ module.exports = {
       "expo-router",
       "expo-web-browser",
       "expo-splash-screen",
-      "expo-location"
+      "expo-location",
+      "expo-notifications"
     ],
     extra: {
       eas: {
