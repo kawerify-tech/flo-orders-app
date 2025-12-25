@@ -21,7 +21,8 @@ module.exports = {
       adaptiveIcon: {
         foregroundImage: "./assets/images/flo-logo.png",
         backgroundColor: "#ffffff"
-      }
+      },
+      googleServicesFile: "./android/app/google-services.json"
     },
     ios: {
       supportsTablet: true,
@@ -88,6 +89,12 @@ module.exports = {
             deploymentTarget: "15.1",
             newArchEnabled: false,
             flipper: false
+          },
+          android: {
+            newArchEnabled: false,
+            compileSdkVersion: 35,
+            targetSdkVersion: 35,
+            minSdkVersion: 24
           }
         }
       ],
