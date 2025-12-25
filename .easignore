@@ -3,3 +3,37 @@
 # Custom files like google-services.json are preserved via app.config.js references
 # The expo-doctor warning is expected for projects using prebuild with native folders
 
+# Gradle build artifacts (causes EBUSY errors on Windows)
+.gradle/
+.gradle/**
+android/.gradle/
+android/.gradle/**
+
+# Build output directories
+build/
+android/build/
+android/app/build/
+ios/build/
+
+# Local build artifacts
+*.apk
+*.aab
+*.ipa
+*.dSYM.zip
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*.lock
+
