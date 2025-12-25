@@ -1,7 +1,6 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
-apply plugin: "com.google.gms.google-services"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -133,12 +132,6 @@ android {
     }
 }
 
-configurations.all {
-    resolutionStrategy {
-        force 'com.tom_roush:pdfbox-android:1.8.10.3'
-    }
-}
-
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
 // Accepts values in comma delimited lists, example:
 // android.packagingOptions.pickFirsts=/LICENSE,**/picasa.ini
@@ -186,8 +179,6 @@ dependencies {
     } else {
         implementation jscFlavor
     }
-
-    // Explicitly add pdfbox-android dependency for react-native-pdf-lib
-    // Using a version that's available on JitPack
-    implementation("com.tom_roush:pdfbox-android:1.8.10.3")
 }
+
+apply plugin: 'com.google.gms.google-services'

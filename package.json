@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "test": "jest --watchAll",
     "lint": "expo lint",
+    "doctor": "node ./scripts/expo-doctor-safe.js",
     "reset-project": "node ./scripts/reset-project.js",
     "setup-ios": "node setup-ios.js",
     "build-ios-preview": "eas build --platform ios --profile preview",
