@@ -98,11 +98,11 @@ module.exports = {
         {
           ios: {
             deploymentTarget: "15.1",
-            newArchEnabled: false,
+            newArchEnabled: true,
             flipper: false
           },
           android: {
-            newArchEnabled: false,
+            newArchEnabled: true,
             compileSdkVersion: 35,
             targetSdkVersion: 35,
             minSdkVersion: 24
