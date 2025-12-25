@@ -1,9 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.INTERNET"/>
-  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+  <!-- Storage permissions: Required for PDF generation and saving -->
+  <!-- For Android 10+ (API 29+), scoped storage is used, but these permissions are still needed for legacy compatibility -->
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
+  <!-- For Android 13+ (API 33+), use granular media permissions -->
+  <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+  <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+  <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+  <!-- System alert window: Required for overlay functionality -->
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+  <!-- Vibration: Required for notification feedback -->
   <uses-permission android:name="android.permission.VIBRATE"/>
-  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <!-- Location: Required for account security and unauthorized access detection -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>

@@ -193,17 +193,31 @@ export default function Settings() {
         text: 'Logout',
         style: 'destructive',
         onPress: async () => {
-          setLoading(true);
+          setIsLoggingOut(true);
           try {
-            await AsyncStorage.removeItem('userRole');
+            // Clear all stored authentication data
+            await AsyncStorage.multiRemove([
+              'userRole',
+              'isSignedIn',
+              'lastSignInTime',
+              'deviceInfo',
+              'lastLocation',
+              'lastLoginEmail',
+            ]);
+            
             // Sign out from Firebase
             await signOut(auth);
-            // Navigate to signin screen
-            router.push('/signin');
+            
+            // Clear user role from context
+            setUserRole(null);
+            
+            // Navigate to signin screen using replace to prevent going back
+            router.replace('/signin' as any);
           } catch (error) {
             console.error('Error signing out:', error);
             Alert.alert('Error', 'Failed to log out. Please try again.');
           } finally {
+            setIsLoggingOut(false);
             setLoading(false);
           }
         }

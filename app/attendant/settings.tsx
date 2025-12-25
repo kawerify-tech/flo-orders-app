@@ -60,7 +60,9 @@ const Settings: React.FC = () => {
         }
 
         const userEmail = user.email;
-        console.log('Current user email:', userEmail); // Debug log
+        if (__DEV__) {
+          console.log('Current user email:', userEmail);
+        }
         setUserEmail(userEmail || '');
         
         // Check if user is attendant by checking the attendants collection
@@ -69,7 +71,9 @@ const Settings: React.FC = () => {
         const querySnapshot = await getDocs(q);
         
         if (!querySnapshot.empty) {
-          console.log('User is attendant'); // Debug log
+          if (__DEV__) {
+            console.log('User is attendant');
+          }
           setUserRole('attendant');
           const attendantData = querySnapshot.docs[0].data();
           setUserData(attendantData);
@@ -77,7 +81,9 @@ const Settings: React.FC = () => {
           if (attendantData.language) setLanguage(attendantData.language);
           if (attendantData.notifications !== undefined) setNotifications(attendantData.notifications);
         } else {
-          console.log('User is not attendant'); // Debug log
+          if (__DEV__) {
+            console.log('User is not attendant');
+          }
           // If not attendant, redirect to signin
           Alert.alert('Error', 'Unauthorized access');
           await signOut(auth);
@@ -181,11 +187,21 @@ const Settings: React.FC = () => {
         onPress: async () => {
           setLoading(true);
           try {
-            await AsyncStorage.removeItem('userRole');
+            // Clear all stored authentication data
+            await AsyncStorage.multiRemove([
+              'userRole',
+              'isSignedIn',
+              'lastSignInTime',
+              'deviceInfo',
+              'lastLocation',
+              'lastLoginEmail',
+            ]);
+            
             // Sign out from Firebase
             await signOut(auth);
-            // Navigate to signin screen
-            router.replace('/signin');
+            
+            // Navigate to signin screen using replace to prevent going back
+            router.replace('/signin' as any);
           } catch (error) {
             console.error('Error signing out:', error);
             Alert.alert('Error', 'Failed to log out. Please try again.');

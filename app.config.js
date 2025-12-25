@@ -22,7 +22,9 @@ module.exports = {
         foregroundImage: "./assets/images/flo-logo.png",
         backgroundColor: "#ffffff"
       },
-      googleServicesFile: "./android/app/google-services.json"
+      googleServicesFile: "./android/app/google-services.json",
+      // Privacy Policy URL - REQUIRED for Google Play Store submission
+      privacy: "https://kawerifytech.com/privacy-policy"
     },
     ios: {
       supportsTablet: true,
@@ -46,6 +48,8 @@ module.exports = {
           }
         ]
       },
+      // Privacy Policy URL - REQUIRED for App Store submission
+      privacy: "https://kawerifytech.com/privacy-policy",
       infoPlist: {
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: false,
@@ -60,6 +64,9 @@ module.exports = {
             }
           }
         },
+        // Permission usage descriptions - REQUIRED for App Store if permissions are requested
+        NSUserNotificationsUsageDescription: "We need notification permissions to send you important updates about your fuel orders and transactions.",
+        NSLocationWhenInUseUsageDescription: "We need your location to enhance account security and detect unauthorized access to your account.",
         CFBundleURLTypes: [
           {
             CFBundleURLName: "com.floorders",
@@ -101,7 +108,8 @@ module.exports = {
       "expo-font",
       "expo-router",
       "expo-web-browser",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-location"
     ],
     extra: {
       eas: {

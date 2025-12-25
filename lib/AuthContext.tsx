@@ -37,27 +37,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resolveRole = async (email: string): Promise<string | null> => {
-    const normalizedEmail = email.toLowerCase();
+    try {
+      const normalizedEmail = email.toLowerCase();
 
-    const adminRef = firestoreDoc(db, 'admins', 'admin');
-    const adminSnap = await getDoc(adminRef);
-    if (adminSnap.exists() && String(adminSnap.data().email || '').toLowerCase() === normalizedEmail) {
-      return 'admin';
+      const adminRef = firestoreDoc(db, 'admins', 'admin');
+      const adminSnap = await getDoc(adminRef);
+      if (adminSnap.exists() && String(adminSnap.data()?.email || '').toLowerCase() === normalizedEmail) {
+        return 'admin';
+      }
+
+      const attendantsQuery = query(collection(db, 'attendants'), where('email', '==', normalizedEmail));
+      const attendantsSnap = await getDocs(attendantsQuery);
+      if (!attendantsSnap.empty) {
+        return 'attendant';
+      }
+
+      const clientsQuery = query(collection(db, 'clients'), where('email', '==', normalizedEmail));
+      const clientsSnap = await getDocs(clientsQuery);
+      if (!clientsSnap.empty) {
+        return 'client';
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error resolving role:', error);
+      return null;
     }
-
-    const attendantsQuery = query(collection(db, 'attendants'), where('email', '==', normalizedEmail));
-    const attendantsSnap = await getDocs(attendantsQuery);
-    if (!attendantsSnap.empty) {
-      return 'attendant';
-    }
-
-    const clientsQuery = query(collection(db, 'clients'), where('email', '==', normalizedEmail));
-    const clientsSnap = await getDocs(clientsQuery);
-    if (!clientsSnap.empty) {
-      return 'client';
-    }
-
-    return null;
   };
 
   // Check for stored auth state on app start
@@ -88,7 +93,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (currentUser) {
             // User is signed in
-            console.log('User is signed in:', currentUser.email);
+            if (__DEV__) {
+              console.log('User is signed in:', currentUser.email);
+            }
 
             const email = currentUser.email || '';
             const storedRole = await AsyncStorage.getItem('userRole');
@@ -104,17 +111,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (role) {
               setUserRole(role);
-              await AsyncStorage.setItem('userRole', role);
+              try {
+                await AsyncStorage.setItem('userRole', role);
+              } catch (storageError) {
+                console.error('Error storing user role:', storageError);
+              }
               const target = routeForRole(role);
               if (target) {
-                router.replace(target as any);
+                try {
+                  router.replace(target as any);
+                } catch (navError) {
+                  console.error('Error navigating:', navError);
+                }
               }
             }
           } else {
             // User is signed out
-            console.log('User is signed out');
+            if (__DEV__) {
+              console.log('User is signed out');
+            }
             setUserRole(null);
-            await AsyncStorage.removeItem('userRole');
+            // Clear all auth-related storage
+            try {
+              await AsyncStorage.multiRemove([
+                'userRole',
+                'isSignedIn',
+                'lastSignInTime',
+                'deviceInfo',
+                'lastLocation',
+              ]);
+            } catch (storageError) {
+              console.error('Error clearing storage:', storageError);
+            }
+            // Navigate to signin if not already there
+            if (router) {
+              router.replace('/signin' as any);
+            }
           }
         } catch (error) {
           console.error('Error in auth state change handler:', error);

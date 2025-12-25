@@ -48,11 +48,11 @@ dependencyResolutionManagement {
     }
 }
 
-extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
+extensions.getByType<com.facebook.react.ReactSettingsExtension>().apply {
     if (System.getenv("EXPO_USE_COMMUNITY_AUTOLINKING") == "1") {
-        ex.autolinkLibrariesFromCommand()
+        autolinkLibrariesFromCommand()
     } else {
-        ex.autolinkLibrariesFromCommand(expoAutolinking.rnConfigCommand)
+        autolinkLibrariesFromCommand(expoAutolinking.rnConfigCommand)
     }
 }
 expoAutolinking.useExpoModules()

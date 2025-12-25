@@ -56,13 +56,17 @@ const Settings: React.FC = () => {
       try {
         const currentUser = auth.currentUser;
         if (!currentUser) {
-          console.log('No user found');
+          if (__DEV__) {
+            console.log('No user found');
+          }
           router.replace('/signin');
           return;
         }
 
         const userEmail = currentUser.email;
-        console.log('Current user email:', userEmail); // Debug log
+        if (__DEV__) {
+          console.log('Current user email:', userEmail);
+        }
         setUserEmail(userEmail || '');
         
         // Check if user is admin by checking the admins document
@@ -70,7 +74,9 @@ const Settings: React.FC = () => {
         const adminSnap = await getDoc(adminRef);
         
         if (adminSnap.exists() && adminSnap.data().email === userEmail) {
-          console.log('User is admin'); // Debug log
+          if (__DEV__) {
+            console.log('User is admin');
+          }
           setUserRole('admin');
           setUserData(adminSnap.data());
           // Load admin settings if they exist
@@ -78,7 +84,9 @@ const Settings: React.FC = () => {
           if (adminSettings.language) setLanguage(adminSettings.language);
           if (adminSettings.notifications !== undefined) setNotifications(adminSettings.notifications);
         } else {
-          console.log('User is not admin'); // Debug log
+          if (__DEV__) {
+            console.log('User is not admin');
+          }
           // If not admin, redirect to signin
           Alert.alert('Error', 'Unauthorized access');
           await signOut(auth);
@@ -174,11 +182,21 @@ const Settings: React.FC = () => {
         onPress: async () => {
           setLoading(true);
           try {
-            await AsyncStorage.removeItem('userRole');
+            // Clear all stored authentication data
+            await AsyncStorage.multiRemove([
+              'userRole',
+              'isSignedIn',
+              'lastSignInTime',
+              'deviceInfo',
+              'lastLocation',
+              'lastLoginEmail',
+            ]);
+            
             // Sign out from Firebase
             await signOut(auth);
-            // Navigate to signin screen
-            router.push('/signin');
+            
+            // Navigate to signin screen using replace to prevent going back
+            router.replace('/signin' as any);
           } catch (error) {
             console.error('Error signing out:', error);
             Alert.alert('Error', 'Failed to log out. Please try again.');

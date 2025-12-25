@@ -1,5 +1,5 @@
-import { StyleSheet, Text, TouchableOpacity, View, Image } from "react-native";
-import React, { useEffect } from "react";
+import { StyleSheet, Text, TouchableOpacity, View, Image, ActivityIndicator } from "react-native";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { useBreakpoint } from '../constants/breakpoints';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,17 +8,63 @@ import { auth } from '../lib/firebaseConfig';
 const WelcomeScreen = () => {
   const router = useRouter();
   const breakpoint = useBreakpoint();
+  const [checkingTerms, setCheckingTerms] = useState(true);
 
   useEffect(() => {
     const init = async () => {
       try {
-        if (!auth.currentUser) return;
-        const storedRole = await AsyncStorage.getItem('userRole');
-        if (storedRole === 'admin') router.replace('/admin' as any);
-        else if (storedRole === 'attendant') router.replace('/attendant' as any);
-        else if (storedRole === 'client') router.replace('/clients' as any);
-      } catch {
-        // ignore
+        // Check if terms have been accepted
+        const termsAccepted = await AsyncStorage.getItem('termsAccepted');
+        if (!termsAccepted) {
+          // Redirect to terms acceptance screen
+          try {
+            router.replace('/terms-acceptance' as any);
+          } catch (navError) {
+            console.error('Navigation error:', navError);
+            setCheckingTerms(false);
+          }
+          return;
+        }
+
+        // Check if user is already logged in
+        try {
+          if (!auth.currentUser) {
+            setCheckingTerms(false);
+            return;
+          }
+
+          const storedRole = await AsyncStorage.getItem('userRole');
+          if (storedRole === 'admin') {
+            try {
+              router.replace('/admin' as any);
+            } catch (e) {
+              console.error('Navigation error:', e);
+              setCheckingTerms(false);
+            }
+          } else if (storedRole === 'attendant') {
+            try {
+              router.replace('/attendant' as any);
+            } catch (e) {
+              console.error('Navigation error:', e);
+              setCheckingTerms(false);
+            }
+          } else if (storedRole === 'client') {
+            try {
+              router.replace('/clients' as any);
+            } catch (e) {
+              console.error('Navigation error:', e);
+              setCheckingTerms(false);
+            }
+          } else {
+            setCheckingTerms(false);
+          }
+        } catch (authError) {
+          console.error('Auth check error:', authError);
+          setCheckingTerms(false);
+        }
+      } catch (error) {
+        console.error('Init error:', error);
+        setCheckingTerms(false);
       }
     };
 
@@ -41,6 +87,14 @@ const WelcomeScreen = () => {
   const buttonMarginTop = isTv ? 60 : isDesktop ? 24 : isTablet ? 30 : 20;
   const buttonBottomSpace = isTv ? 120 : isDesktop ? 48 : isTablet ? 60 : 40;
   const contentMaxWidth = isDesktop ? 420 : '100%';
+
+  if (checkingTerms) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container]}> 
@@ -70,7 +124,7 @@ const WelcomeScreen = () => {
             marginTop: buttonMarginTop,
           }]}
           onPress={() => {
-            router.push("/signin");
+            router.replace("/signin" as any);
           }}
         >
           <Text style={[styles.buttonText, { fontSize: buttonFontSize }]}>Next</Text>
