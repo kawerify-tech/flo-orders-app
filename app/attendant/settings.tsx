@@ -7,6 +7,7 @@ import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase
 import { db } from '../../lib/firebaseConfig';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
 
 // Available languages
 const LANGUAGES = [
@@ -214,156 +215,175 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#6A0DAD" />
-        </View>
-      )}
+    <SafeAreaLayout>
+      <ScrollView style={styles.container}>
+        {loading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#6A0DAD" />
+          </View>
+        )}
 
-      <Text style={styles.header}>Settings</Text>
+        <Text style={styles.header}>Settings</Text>
 
-      {/* Profile Section */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Profile Settings</Text>
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileLabel}>Email:</Text>
-          <Text style={styles.profileValue}>{userEmail || 'Not available'}</Text>
+        {/* Profile Section */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Profile Settings</Text>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileLabel}>Email:</Text>
+            <Text style={styles.profileValue}>{userEmail || 'Not available'}</Text>
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileLabel}>Role:</Text>
+            <Text style={styles.profileValue}>{userRole || 'Not available'}</Text>
+          </View>
+          <Pressable 
+            style={styles.changePasswordButton} 
+            onPress={() => setShowChangePasswordModal(true)}
+          >
+            <Text style={styles.changePasswordText}>Change Password</Text>
+          </Pressable>
         </View>
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileLabel}>Role:</Text>
-          <Text style={styles.profileValue}>{userRole || 'Not available'}</Text>
+
+        {/* App Settings Section */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>App Settings</Text>
+
+          <View style={styles.option}>
+            <Text style={styles.optionText}>Language</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={language}
+                onValueChange={setLanguage}
+                style={styles.picker}
+              >
+                {LANGUAGES.map((lang) => (
+                  <Picker.Item 
+                    key={lang.value} 
+                    label={lang.label} 
+                    value={lang.value}
+                  />
+                ))}
+              </Picker>
+            </View>
+          </View>
+
+          <View style={styles.option}>
+            <Text style={styles.optionText}>Notifications</Text>
+            <Switch 
+              value={notifications} 
+              onValueChange={setNotifications}
+              trackColor={{ false: '#767577', true: '#81b0ff' }}
+              thumbColor={notifications ? '#6A0DAD' : '#f4f3f4'}
+            />
+          </View>
         </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Legal</Text>
+
+          <Pressable style={styles.legalRow} onPress={() => router.push('/legal/user-agreement' as any)}>
+            <Text style={styles.legalRowText}>User Agreement</Text>
+          </Pressable>
+          <Pressable style={styles.legalRow} onPress={() => router.push('/legal/terms-of-service' as any)}>
+            <Text style={styles.legalRowText}>Terms of Service</Text>
+          </Pressable>
+          <Pressable style={styles.legalRow} onPress={() => router.push('/legal/privacy-policy' as any)}>
+            <Text style={styles.legalRowText}>Privacy Policy</Text>
+          </Pressable>
+          <Pressable style={styles.legalRow} onPress={() => router.push('/legal/more-info' as any)}>
+            <Text style={styles.legalRowText}>More Info</Text>
+          </Pressable>
+        </View>
+
+        {/* Logout Button */}
         <Pressable 
-          style={styles.changePasswordButton} 
-          onPress={() => setShowChangePasswordModal(true)}
+          style={styles.logoutButton} 
+          onPress={handleLogout}
+          disabled={loading}
         >
-          <Text style={styles.changePasswordText}>Change Password</Text>
+          <Text style={styles.logoutButtonText}>Logout</Text>
         </Pressable>
-      </View>
 
-      {/* App Settings Section */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>App Settings</Text>
-
-        <View style={styles.option}>
-          <Text style={styles.optionText}>Language</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={language}
-              onValueChange={setLanguage}
-              style={styles.picker}
-            >
-              {LANGUAGES.map((lang) => (
-                <Picker.Item 
-                  key={lang.value} 
-                  label={lang.label} 
-                  value={lang.value}
-                />
-              ))}
-            </Picker>
-          </View>
-        </View>
-
-        <View style={styles.option}>
-          <Text style={styles.optionText}>Notifications</Text>
-          <Switch 
-            value={notifications} 
-            onValueChange={setNotifications}
-            trackColor={{ false: '#767577', true: '#81b0ff' }}
-            thumbColor={notifications ? '#6A0DAD' : '#f4f3f4'}
-          />
-        </View>
-      </View>
-
-      {/* Logout Button */}
-      <Pressable 
-        style={styles.logoutButton} 
-        onPress={handleLogout}
-        disabled={loading}
-      >
-        <Text style={styles.logoutButtonText}>Logout</Text>
-      </Pressable>
-
-      {/* Change Password Modal */}
-      <Modal visible={showChangePasswordModal} animationType="slide" transparent>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalHeader}>Change Password</Text>
-            
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Current Password"
-                placeholderTextColor="#666"
-                secureTextEntry={!showCurrentPassword}
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-              />
-              <Pressable 
-                style={styles.eyeIcon}
-                onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-              >
-                <Ionicons 
-                  name={showCurrentPassword ? 'eye-off' : 'eye'} 
-                  size={24} 
-                  color="#666"
-                />
-              </Pressable>
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="New Password"
-                placeholderTextColor="#666"
-                secureTextEntry={!showNewPassword}
-                value={newPassword}
-                onChangeText={setNewPassword}
-              />
-              <Pressable 
-                style={styles.eyeIcon}
-                onPress={() => setShowNewPassword(!showNewPassword)}
-              >
-                <Ionicons 
-                  name={showNewPassword ? 'eye-off' : 'eye'} 
-                  size={24} 
-                  color="#666"
-                />
-              </Pressable>
-            </View>
-            
-            <View style={styles.modalButtonContainer}>
-              <Pressable 
-                style={[styles.modalButton, styles.saveButton]} 
-                onPress={handleChangePassword}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Save</Text>
-                )}
-              </Pressable>
+        {/* Change Password Modal */}
+        <Modal visible={showChangePasswordModal} animationType="slide" transparent>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalHeader}>Change Password</Text>
               
-              <Pressable
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowChangePasswordModal(false);
-                  setNewPassword('');
-                  setCurrentPassword('');
-                  setShowCurrentPassword(false);
-                  setShowNewPassword(false);
-                }}
-                disabled={loading}
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </Pressable>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Current Password"
+                  placeholderTextColor="#666"
+                  secureTextEntry={!showCurrentPassword}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                />
+                <Pressable 
+                  style={styles.eyeIcon}
+                  onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                >
+                  <Ionicons 
+                    name={showCurrentPassword ? 'eye-off' : 'eye'} 
+                    size={24} 
+                    color="#666"
+                  />
+                </Pressable>
+              </View>
+              
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="New Password"
+                  placeholderTextColor="#666"
+                  secureTextEntry={!showNewPassword}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                />
+                <Pressable 
+                  style={styles.eyeIcon}
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                >
+                  <Ionicons 
+                    name={showNewPassword ? 'eye-off' : 'eye'} 
+                    size={24} 
+                    color="#666"
+                  />
+                </Pressable>
+              </View>
+              
+              <View style={styles.modalButtonContainer}>
+                <Pressable 
+                  style={[styles.modalButton, styles.saveButton]} 
+                  onPress={handleChangePassword}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Save</Text>
+                  )}
+                </Pressable>
+                
+                <Pressable
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowChangePasswordModal(false);
+                    setNewPassword('');
+                    setCurrentPassword('');
+                    setShowCurrentPassword(false);
+                    setShowNewPassword(false);
+                  }}
+                  disabled={loading}
+                >
+                  <Text style={styles.buttonText}>Cancel</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        </Modal>
+      </ScrollView>
+    </SafeAreaLayout>
   );
 };
 
@@ -533,6 +553,16 @@ const styles = StyleSheet.create({
     color: '#666',
     flex: 1,
   },
+  legalRow: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  legalRowText: {
+    fontSize: 16,
+    color: '#6A0DAD',
+    fontWeight: '600',
+  },
 });
 
-export default Settings; 
+export default Settings;

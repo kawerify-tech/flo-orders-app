@@ -7,6 +7,7 @@ import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase
 import { db } from '../../lib/firebaseConfig';
 import { Picker } from '@react-native-picker/picker';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
 
 // Available languages
 const LANGUAGES = [
@@ -209,12 +210,13 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#6A0DAD" />
-        </View>
-      )}
+    <SafeAreaLayout>
+      <ScrollView style={styles.container}>
+        {loading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#6A0DAD" />
+          </View>
+        )}
 
       <Text style={styles.header}>Settings</Text>
 
@@ -269,6 +271,23 @@ const Settings: React.FC = () => {
             thumbColor={notifications ? '#6A0DAD' : '#f4f3f4'}
           />
         </View>
+      </View>
+
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>Legal</Text>
+
+        <Pressable style={styles.legalRow} onPress={() => router.push('/legal/user-agreement' as any)}>
+          <Text style={styles.legalRowText}>User Agreement</Text>
+        </Pressable>
+        <Pressable style={styles.legalRow} onPress={() => router.push('/legal/terms-of-service' as any)}>
+          <Text style={styles.legalRowText}>Terms of Service</Text>
+        </Pressable>
+        <Pressable style={styles.legalRow} onPress={() => router.push('/legal/privacy-policy' as any)}>
+          <Text style={styles.legalRowText}>Privacy Policy</Text>
+        </Pressable>
+        <Pressable style={styles.legalRow} onPress={() => router.push('/legal/more-info' as any)}>
+          <Text style={styles.legalRowText}>More Info</Text>
+        </Pressable>
       </View>
 
       {/* Logout Button */}
@@ -358,7 +377,8 @@ const Settings: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaLayout>
   );
 };
 
@@ -527,6 +547,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     flex: 1,
+  },
+  legalRow: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  legalRowText: {
+    fontSize: 16,
+    color: '#6A0DAD',
+    fontWeight: '600',
   },
 });
 

@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../lib/AuthContext';
 import { NavigationGuard } from '../components/NavigationGuard';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -41,18 +42,24 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <NavigationGuard />
-        <StatusBar style="light" backgroundColor="transparent" translucent={true} />
-        <Stack>
-          <Stack.Screen name="terms-acceptance" options={{ headerShown: false }} />
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="signin" options={{ headerShown: false, gestureEnabled: false }} />
-          <Stack.Screen name="admin" options={{ headerShown: false }} />
-          <Stack.Screen name="attendant" options={{ headerShown: false }} />
-          <Stack.Screen name="clients" options={{ headerShown: false }} />
-        </Stack>
-      </AuthProvider>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <NavigationGuard />
+          <StatusBar style="light" backgroundColor="transparent" translucent={true} />
+          <Stack>
+            <Stack.Screen name="terms-acceptance" options={{ headerShown: false }} />
+            <Stack.Screen name="legal/user-agreement" options={{ headerShown: false }} />
+            <Stack.Screen name="legal/terms-of-service" options={{ headerShown: false }} />
+            <Stack.Screen name="legal/privacy-policy" options={{ headerShown: false }} />
+            <Stack.Screen name="legal/more-info" options={{ headerShown: false }} />
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="signin" options={{ headerShown: false, gestureEnabled: false }} />
+            <Stack.Screen name="admin" options={{ headerShown: false }} />
+            <Stack.Screen name="attendant" options={{ headerShown: false }} />
+            <Stack.Screen name="clients" options={{ headerShown: false }} />
+          </Stack>
+        </AuthProvider>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

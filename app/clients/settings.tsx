@@ -42,6 +42,11 @@ export default function Settings() {
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showTermsOfService, setShowTermsOfService] = useState(false);
 
+  const openUserAgreement = () => router.push('/legal/user-agreement' as any);
+  const openTermsOfService = () => router.push('/legal/terms-of-service' as any);
+  const openPrivacyPolicy = () => router.push('/legal/privacy-policy' as any);
+  const openMoreInfo = () => router.push('/legal/more-info' as any);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -373,10 +378,12 @@ export default function Settings() {
   if (!auth.currentUser) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <MaterialIcons name="error-outline" size={48} color="#FF5252" />
-          <Text style={styles.errorText}>Please sign in to view your profile</Text>
-        </View>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.errorContainer}>
+            <MaterialIcons name="error-outline" size={48} color="#FF5252" />
+            <Text style={styles.errorText}>Please sign in to view your profile</Text>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -422,7 +429,7 @@ export default function Settings() {
                 {renderProfileItem('Pump Price', `$${clientData.pumpPrice.toFixed(2)}/L`)}
               </View>
 
-              <View style={styles.divider} />
+              <Divider style={styles.divider} />
 
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Contact Information</Text>
@@ -505,15 +512,27 @@ export default function Settings() {
           <List.Section>
             <List.Subheader>Legal</List.Subheader>
             <List.Item
+              title="User Agreement"
+              left={props => <List.Icon {...props} icon="file-document" />}
+              onPress={openUserAgreement}
+              right={props => <List.Icon {...props} icon="chevron-right" />}
+            />
+            <List.Item
               title="Privacy Policy"
               left={props => <List.Icon {...props} icon="shield-account" />}
-              onPress={() => setShowPrivacyPolicy(true)}
+              onPress={openPrivacyPolicy}
               right={props => <List.Icon {...props} icon="chevron-right" />}
             />
             <List.Item
               title="Terms of Service"
               left={props => <List.Icon {...props} icon="file-document" />}
-              onPress={() => setShowTermsOfService(true)}
+              onPress={openTermsOfService}
+              right={props => <List.Icon {...props} icon="chevron-right" />}
+            />
+            <List.Item
+              title="More Info"
+              left={props => <List.Icon {...props} icon="information" />}
+              onPress={openMoreInfo}
               right={props => <List.Icon {...props} icon="chevron-right" />}
             />
           </List.Section>

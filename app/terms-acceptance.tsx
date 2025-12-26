@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useBreakpoint } from '../constants/breakpoints';
 import * as Notifications from 'expo-notifications';
+import { LEGAL } from '../lib/legal';
 
 const TermsAcceptanceScreen = () => {
   const [accepted, setAccepted] = useState(false);
@@ -39,10 +40,12 @@ const TermsAcceptanceScreen = () => {
 
     setLoading(true);
     try {
-      // Store terms acceptance
+      // Store versioned legal acceptance
       try {
-        await AsyncStorage.setItem('termsAccepted', 'true');
-        await AsyncStorage.setItem('termsAcceptedDate', new Date().toISOString());
+        await AsyncStorage.setItem(
+          LEGAL.acceptanceStorageKey,
+          JSON.stringify({ agreementId: LEGAL.agreementId, acceptedAtIso: new Date().toISOString() })
+        );
       } catch (storageError) {
         console.error('Error storing terms acceptance:', storageError);
         Alert.alert('Error', 'Failed to save acceptance. Please try again.');
@@ -140,9 +143,19 @@ const TermsAcceptanceScreen = () => {
   };
 
   const openPrivacyPolicy = () => {
-    Linking.openURL('https://kawerifytech.com/privacy-policy').catch(err =>
-      console.error('Failed to open privacy policy:', err)
-    );
+    router.push('/legal/privacy-policy' as any);
+  };
+
+  const openUserAgreement = () => {
+    router.push('/legal/user-agreement' as any);
+  };
+
+  const openTermsOfService = () => {
+    router.push('/legal/terms-of-service' as any);
+  };
+
+  const openMoreInfo = () => {
+    router.push('/legal/more-info' as any);
   };
 
   const openFloEnergyWebsite = () => {
@@ -178,6 +191,22 @@ const TermsAcceptanceScreen = () => {
           <Text style={[styles.subtitle, { fontSize: textFontSize }]}>
             Please read and accept to continue
           </Text>
+        </View>
+
+        <View style={styles.content}>
+          <Text style={[styles.sectionTitle, { fontSize: textFontSize + 2 }]}>Legal Documents</Text>
+          <TouchableOpacity onPress={openUserAgreement} style={styles.linkButton}>
+            <Text style={[styles.linkText, { fontSize: textFontSize }]}>View User Agreement →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={openTermsOfService} style={styles.linkButton}>
+            <Text style={[styles.linkText, { fontSize: textFontSize }]}>View Terms of Service →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={openPrivacyPolicy} style={styles.linkButton}>
+            <Text style={[styles.linkText, { fontSize: textFontSize }]}>View Privacy Policy →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={openMoreInfo} style={styles.linkButton}>
+            <Text style={[styles.linkText, { fontSize: textFontSize }]}>More Info →</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.content}>

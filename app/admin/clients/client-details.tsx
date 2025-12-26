@@ -13,6 +13,7 @@ import * as Sharing from 'expo-sharing';
 import Modal from 'react-native-modal';
 import { useLocalSearchParams } from 'expo-router';
 import { ViewStyle, TextStyle, ImageStyle } from 'react-native';
+import { SafeAreaLayout } from '../../../components/SafeAreaLayout';
 
 type FetchClientDetails = (id: string) => Promise<void>;
 
@@ -1252,49 +1253,54 @@ const ClientDetails = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text style={styles.loadingText}>Loading client data...</Text>
-      </View>
+      <SafeAreaLayout>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0000ff" />
+          <Text style={styles.loadingText}>Loading client data...</Text>
+        </View>
+      </SafeAreaLayout>
     );
   }
 
   if (!clientData) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>No client data available</Text>
-        <Button
-          title="Try Again"
-          onPress={() => {
-            if (clientId) {
-              fetchClientDetails(clientId);
-            } else if (clientName) {
-              searchClientByName(clientName);
-            }
-          }}
-        />
-      </View>
+      <SafeAreaLayout>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>No client data available</Text>
+          <Button
+            title="Try Again"
+            onPress={() => {
+              if (clientId) {
+                fetchClientDetails(clientId);
+              } else if (clientName) {
+                searchClientByName(clientName);
+              }
+            }}
+          />
+        </View>
+      </SafeAreaLayout>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{clientData.name}</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity 
-            style={styles.topupButton} 
-            onPress={() => setIsTopupModalVisible(true)}
-          >
-            <Icon name="add-circle" size={24} color="#fff" />
-            <Text style={styles.buttonText}>Topup</Text>
-          </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={generatePDF}>
-          <Icon name="download" size={24} color="#fff" />
-            <Text style={styles.buttonText}>Export PDF</Text>
-        </TouchableOpacity>
+    <SafeAreaLayout>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{clientData.name}</Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.topupButton} 
+              onPress={() => setIsTopupModalVisible(true)}
+            >
+              <Icon name="add-circle" size={24} color="#fff" />
+              <Text style={styles.buttonText}>Topup</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.exportButton} onPress={generatePDF}>
+              <Icon name="download" size={24} color="#fff" />
+              <Text style={styles.buttonText}>Export PDF</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Client Information</Text>
@@ -2102,7 +2108,8 @@ const ClientDetails = () => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaLayout>
   );
 };
 

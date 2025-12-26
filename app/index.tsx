@@ -4,6 +4,8 @@ import { useRouter } from "expo-router";
 import { useBreakpoint } from '../constants/breakpoints';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../lib/firebaseConfig';
+import { SafeAreaLayout } from '../components/SafeAreaLayout';
+import { LEGAL } from '../lib/legal';
 
 const WelcomeScreen = () => {
   const router = useRouter();
@@ -13,9 +15,10 @@ const WelcomeScreen = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        // Check if terms have been accepted
-        const termsAccepted = await AsyncStorage.getItem('termsAccepted');
-        if (!termsAccepted) {
+        // Check if the current legal agreement has been accepted
+        const acceptanceRaw = await AsyncStorage.getItem(LEGAL.acceptanceStorageKey);
+        const acceptance = acceptanceRaw ? JSON.parse(acceptanceRaw) : null;
+        if (!acceptance || acceptance.agreementId !== LEGAL.agreementId) {
           // Redirect to terms acceptance screen
           try {
             router.replace('/terms-acceptance' as any);
@@ -90,48 +93,52 @@ const WelcomeScreen = () => {
 
   if (checkingTerms) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
+      <SafeAreaLayout>
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      </SafeAreaLayout>
     );
   }
 
   return (
-    <View style={[styles.container]}> 
-      {/* Logo Section (Top) with Rounded Bottom Corners */}
-      <View style={[styles.logoContainer, {
-        height: logoContainerHeight,
-        borderBottomLeftRadius: borderRadius,
-        borderBottomRightRadius: borderRadius,
-      }]}
-      >
-        <Image 
-          source={require("../assets/images/flo-logo.png")} 
-          style={{ width: logoSize, height: logoSize, borderRadius }}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* Text and Button Section */}
-      <View style={[styles.contentContainer, { paddingHorizontal: contentPaddingH, maxWidth: contentMaxWidth }]}> 
-        <Text style={[styles.heading, { fontSize: headingFontSize }]}>Welcome to</Text>
-        <Text style={[styles.heading, { fontSize: headingFontSize }]}>FLO Fuel Orders</Text>
-        <TouchableOpacity 
-          style={[styles.button, {
-            paddingVertical: buttonPaddingV,
-            paddingHorizontal: buttonPaddingH,
-            borderRadius,
-            marginTop: buttonMarginTop,
-          }]}
-          onPress={() => {
-            router.replace("/signin" as any);
-          }}
+    <SafeAreaLayout>
+      <View style={[styles.container]}> 
+        {/* Logo Section (Top) with Rounded Bottom Corners */}
+        <View style={[styles.logoContainer, {
+          height: logoContainerHeight,
+          borderBottomLeftRadius: borderRadius,
+          borderBottomRightRadius: borderRadius,
+        }]}
         >
-          <Text style={[styles.buttonText, { fontSize: buttonFontSize }]}>Next</Text>
-        </TouchableOpacity>
-        <View style={{ height: buttonBottomSpace }} />
+          <Image 
+            source={require("../assets/images/flo-logo.png")} 
+            style={{ width: logoSize, height: logoSize, borderRadius }}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Text and Button Section */}
+        <View style={[styles.contentContainer, { paddingHorizontal: contentPaddingH, maxWidth: contentMaxWidth }]}> 
+          <Text style={[styles.heading, { fontSize: headingFontSize }]}>Welcome to</Text>
+          <Text style={[styles.heading, { fontSize: headingFontSize }]}>FLO Fuel Orders</Text>
+          <TouchableOpacity 
+            style={[styles.button, {
+              paddingVertical: buttonPaddingV,
+              paddingHorizontal: buttonPaddingH,
+              borderRadius,
+              marginTop: buttonMarginTop,
+            }]}
+            onPress={() => {
+              router.replace("/signin" as any);
+            }}
+          >
+            <Text style={[styles.buttonText, { fontSize: buttonFontSize }]}>Next</Text>
+          </TouchableOpacity>
+          <View style={{ height: buttonBottomSpace }} />
+        </View>
       </View>
-    </View>
+    </SafeAreaLayout>
   );
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, ScrollView } from 'react-native';
-import { collection, query, where, orderBy, getDocs, updateDoc, doc, Timestamp, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, updateDoc, doc, Timestamp, getDoc, setDoc, increment } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -165,6 +165,29 @@ const TransactionScreen: React.FC = () => {
     fetchTransactions();
   }, []);
 
+  const refreshTransactions = async () => {
+    try {
+      const transactionsRef = collection(db, 'transactions');
+      const q = query(transactionsRef, orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
+
+      const transactions: Transaction[] = [];
+      querySnapshot.forEach((doc) => {
+        transactions.push({ id: doc.id, ...doc.data() } as Transaction);
+      });
+
+      const pending = transactions.filter(t => t.status === 'pending');
+      const completed = transactions.filter(t => t.status === 'completed');
+      const rejected = transactions.filter(t => t.status === 'rejected');
+
+      setTransactionsByStatus({ pending, completed, rejected });
+      setAllTransactions(transactions);
+      setFilteredTransactions(transactions);
+    } catch (error) {
+      console.error('Error refreshing transactions:', error);
+    }
+  };
+
   // Filter transactions based on search query
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -281,51 +304,40 @@ const TransactionScreen: React.FC = () => {
         db, 
         `clients/${transaction.clientEmail}/transactions/${transaction.id}`
       );
-      await updateDoc(clientTransactionRef, {
-        status: 'completed',
-        updatedAt: now,
-        attendantId,
-        attendantName,
-        processedAt: now,
-        processingSteps: [
-          ...(transaction.processingSteps || []),
-          {
-            step: 'approved',
-            timestamp: now,
-            status: 'completed',
-            attendantId,
-            attendantName
-          }
-        ]
-      });
-
-      // Update client's balance
-      const clientRef = doc(db, 'clients', transaction.clientEmail);
-      const clientDoc = await getDoc(clientRef);
-      if (clientDoc.exists()) {
-        const currentBalance = clientDoc.data().balance || 0;
-        await updateDoc(clientRef, {
-          balance: currentBalance - transaction.amount
+      try {
+        await updateDoc(clientTransactionRef, {
+          status: 'completed',
+          updatedAt: now,
+          attendantId,
+          attendantName,
+          processedAt: now,
+          processingSteps: [
+            ...(transaction.processingSteps || []),
+            {
+              step: 'approved',
+              timestamp: now,
+              status: 'completed',
+              attendantId,
+              attendantName
+            }
+          ]
         });
+      } catch (error) {
+        console.error('Error updating client transaction copy:', error);
       }
 
-      // Refresh transactions
-      const transactionsRef = collection(db, 'transactions');
-      const q = query(transactionsRef, orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
-      
-      const transactions: Transaction[] = [];
-      querySnapshot.forEach((doc) => {
-        transactions.push({ id: doc.id, ...doc.data() } as Transaction);
-      });
-      
-      const pending = transactions.filter(t => t.status === 'pending');
-      const completed = transactions.filter(t => t.status === 'completed');
-      const rejected = transactions.filter(t => t.status === 'rejected');
-      
-      setTransactionsByStatus({ pending, completed, rejected });
-      setAllTransactions(transactions);
-      setFilteredTransactions(transactions);
+      // Best-effort: update client's balance (do not block approval UI)
+      try {
+        const clientRef = doc(db, 'clients', transaction.clientEmail);
+        await updateDoc(clientRef, {
+          balance: increment(-transaction.amount)
+        });
+      } catch (error) {
+        console.error('Error updating client balance:', error);
+      }
+
+      // Best-effort: refresh UI
+      await refreshTransactions();
 
       Alert.alert('Success', 'Transaction approved successfully');
     } catch (error) {
@@ -372,41 +384,30 @@ const TransactionScreen: React.FC = () => {
         db, 
         `clients/${transaction.clientEmail}/transactions/${transaction.id}`
       );
-      await updateDoc(clientTransactionRef, {
-        status: 'rejected',
-        updatedAt: now,
-        attendantId,
-        attendantName,
-        processedAt: now,
-        processingSteps: [
-          ...(transaction.processingSteps || []),
-          {
-            step: 'rejected',
-            timestamp: now,
-            status: 'rejected',
-            attendantId,
-            attendantName
-          }
-        ]
-      });
+      try {
+        await updateDoc(clientTransactionRef, {
+          status: 'rejected',
+          updatedAt: now,
+          attendantId,
+          attendantName,
+          processedAt: now,
+          processingSteps: [
+            ...(transaction.processingSteps || []),
+            {
+              step: 'rejected',
+              timestamp: now,
+              status: 'rejected',
+              attendantId,
+              attendantName
+            }
+          ]
+        });
+      } catch (error) {
+        console.error('Error updating client transaction copy:', error);
+      }
 
-      // Refresh transactions
-      const transactionsRef = collection(db, 'transactions');
-      const q = query(transactionsRef, orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
-      
-      const transactions: Transaction[] = [];
-      querySnapshot.forEach((doc) => {
-        transactions.push({ id: doc.id, ...doc.data() } as Transaction);
-      });
-      
-      const pending = transactions.filter(t => t.status === 'pending');
-      const completed = transactions.filter(t => t.status === 'completed');
-      const rejected = transactions.filter(t => t.status === 'rejected');
-      
-      setTransactionsByStatus({ pending, completed, rejected });
-      setAllTransactions(transactions);
-      setFilteredTransactions(transactions);
+      // Best-effort: refresh UI
+      await refreshTransactions();
 
       Alert.alert('Success', 'Transaction rejected successfully');
     } catch (error) {
@@ -465,11 +466,15 @@ const TransactionScreen: React.FC = () => {
       await setDoc(transactionRef, transactionData);
 
       // Create transaction in client's collection
-      const clientTransactionRef = doc(
-        db,
-        `clients/${createForm.selectedClient.email}/transactions/${transactionRef.id}`
-      );
-      await setDoc(clientTransactionRef, transactionData);
+      try {
+        const clientTransactionRef = doc(
+          db,
+          `clients/${createForm.selectedClient.email}/transactions/${transactionRef.id}`
+        );
+        await setDoc(clientTransactionRef, transactionData);
+      } catch (error) {
+        console.error('Error creating client transaction copy:', error);
+      }
 
       // Reset form and close modals
       setCreateForm({
@@ -484,23 +489,8 @@ const TransactionScreen: React.FC = () => {
       setShowClientList(false);
       setModalVisible(false);
 
-      // Refresh transactions
-      const transactionsRef = collection(db, 'transactions');
-      const q = query(transactionsRef, orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
-      
-      const transactions: Transaction[] = [];
-      querySnapshot.forEach((doc) => {
-        transactions.push({ id: doc.id, ...doc.data() } as Transaction);
-      });
-      
-      const pending = transactions.filter(t => t.status === 'pending');
-      const completed = transactions.filter(t => t.status === 'completed');
-      const rejected = transactions.filter(t => t.status === 'rejected');
-      
-      setTransactionsByStatus({ pending, completed, rejected });
-      setAllTransactions(transactions);
-      setFilteredTransactions(transactions);
+      // Best-effort: refresh UI (do not show permission error if this fails)
+      await refreshTransactions();
 
       Alert.alert('Success', 'Transaction created successfully');
     } catch (error) {
@@ -514,10 +504,10 @@ const TransactionScreen: React.FC = () => {
   const renderTransactionItem = ({ item }: { item: Transaction }) => (
     <View style={styles.transactionItem}>
       <View style={styles.transactionHeader}>
-          <Text style={styles.clientName}>{item.clientName}</Text>
-        <Text style={styles.timestamp}>
-            {item.timestamp.toDate().toLocaleString()}
-          </Text>
+        <Text style={styles.clientName} numberOfLines={1} ellipsizeMode="tail">{item.clientName}</Text>
+        <Text style={styles.timestamp} numberOfLines={1} ellipsizeMode="tail">
+          {item.timestamp.toDate().toLocaleString()}
+        </Text>
       </View>
 
       <View style={styles.transactionDetails}>
@@ -848,12 +838,13 @@ const TransactionScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     backgroundColor: '#6A0DAD',
     padding: 20,
     paddingTop: 40,
+    borderRadius: 12,
   },
   headerTitle: {
     fontSize: 24,
@@ -867,31 +858,32 @@ const styles = StyleSheet.create({
   },
   pumpPriceText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    margin: 16,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
     fontSize: 16,
+    color: '#333',
+    paddingVertical: 0,
   },
   clearButton: {
-    padding: 5,
+    padding: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -900,64 +892,63 @@ const styles = StyleSheet.create({
   },
   transactionsList: {
     flex: 1,
-    padding: 16,
   },
   section: {
-    marginBottom: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginTop: 10,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 6,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333333',
+    color: '#333',
   },
   sectionCount: {
-    fontSize: 16,
-    color: '#666666',
-    backgroundColor: '#F0F0F0',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6A0DAD',
+    backgroundColor: 'rgba(106, 13, 173, 0.08)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    overflow: 'hidden',
   },
   transactionItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginVertical: 8,
     padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#6A0DAD',
-    elevation: 2,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    elevation: 2,
   },
   transactionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
   clientName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333333',
+    color: '#333',
+    flex: 1,
+    marginRight: 10,
   },
   timestamp: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: 12,
+    color: '#666',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   transactionDetails: {
     marginBottom: 12,

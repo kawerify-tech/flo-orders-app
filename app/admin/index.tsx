@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '../../lib/firebaseConfig';
 import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
 
 // TypeScript interfaces
 interface Client {
@@ -162,25 +163,25 @@ const AdminHome = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6A0DAD" />
-      </View>
+      <SafeAreaLayout>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6A0DAD" />
+        </View>
+      </SafeAreaLayout>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Admin Dashboard</Text>
-        <Text style={styles.adminEmail}>Welcome, {adminEmail || 'Admin'}</Text>
-      </View>
-
-      <View style={styles.metricsGrid}>
-        <View style={styles.metricCard}>
-          <Ionicons name="people" size={24} color="#6A0DAD" />
-          <Text style={styles.metricValue}>{totalCustomers}</Text>
-          <Text style={styles.metricLabel}>Total Customers</Text>
+    <SafeAreaLayout>
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Admin Dashboard</Text>
+          <TouchableOpacity onPress={() => router.push('/admin/settings')}>
+            <Ionicons name="settings-outline" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
+
+        <View style={styles.metricsGrid}>
 
         <View style={styles.metricCard}>
           <Ionicons name="water" size={24} color="#6A0DAD" />
@@ -356,7 +357,8 @@ const AdminHome = () => {
           <Text style={styles.actionButtonText}>Settings</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaLayout>
   );
 };
 

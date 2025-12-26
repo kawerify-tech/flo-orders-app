@@ -1,9 +1,11 @@
 // firebaseConfig.ts
 import { initializeApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth, initializeAuth } from 'firebase/auth';
+import { getReactNativePersistence } from 'firebase/auth/react-native';
 import { getFirestore, collection, getDocs, addDoc, updateDoc, query, where, orderBy, limit, startAfter, doc, runTransaction } from 'firebase/firestore';
 import { getDatabase, ref, onValue, push, set, serverTimestamp, update, onDisconnect, get, child } from 'firebase/database';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase configuration object
 const firebaseConfig = {
@@ -22,7 +24,11 @@ const app = initializeApp(firebaseConfig);
 
 // Firestore, Authentication, Messaging, and Realtime Database
 const db = getFirestore(app);
-const auth = getAuth(app);
+const auth = Platform.OS === 'web'
+  ? getAuth(app)
+  : initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
 let messaging: any = null;
 let getToken: any = null;
 let onMessage: any = null;

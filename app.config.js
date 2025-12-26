@@ -5,7 +5,7 @@ module.exports = {
     version: "1.0.0",
     platforms: ["ios", "android"],
     orientation: "default",
-    icon: "./assets/images/flo-logo.png",
+    icon: "./assets/images/favicon.png",
     userInterfaceStyle: "automatic",
     splash: {
       image: "./assets/images/flo-logo.png",
@@ -19,7 +19,7 @@ module.exports = {
       package: "com.floorders.floorders",
       versionCode: 4,
       adaptiveIcon: {
-        foregroundImage: "./assets/images/flo-logo.png",
+        foregroundImage: "./assets/images/favicon.png",
         backgroundColor: "#ffffff"
       },
       googleServicesFile: "./android/app/google-services.json",

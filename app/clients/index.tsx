@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   collection,
   query,
@@ -83,6 +84,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
     diesel: '0'
   });
   const auth = getAuth();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let unsubscribeTransactions: (() => void) | undefined;
@@ -278,47 +280,52 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
       return transactionDate >= firstDayOfMonth && transactionDate <= now;
     });
     
-    return monthlyTransactions.reduce((total, transaction) => total + transaction.litres, 0);
+    return monthlyTransactions.reduce((total, transaction) => total + transaction.amount, 0);
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6A0DAD" />
-      </View>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6A0DAD" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!clientData) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>No client profile found</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-          <Icon name="refresh" size={24} color="#6A0DAD" />
-          <Text style={styles.refreshText}>Refresh</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>No client profile found</Text>
+          <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+            <Icon name="refresh" size={24} color="#6A0DAD" />
+            <Text style={styles.refreshText}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Header Section */}
-      <LinearGradient
-        colors={['#8A2BE2', '#6A0DAD']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.headerContent}>
-        <Text style={styles.welcomeText}>Welcome back!</Text>
-          <Text style={styles.nameText}>{clientData?.name}</Text>
-          <Text style={styles.emailText}>{clientData?.email}</Text>
-        <Text style={styles.dateText}>
-          {format(new Date(), 'EEEE, MMMM d, yyyy')}
-        </Text>
-      </View>
-      </LinearGradient>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
+        {/* Header Section */}
+        <LinearGradient
+          colors={['#8A2BE2', '#6A0DAD']}
+          style={styles.header}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.headerContent}>
+          <Text style={styles.welcomeText}>Welcome back!</Text>
+            <Text style={styles.nameText}>{clientData?.name}</Text>
+            <Text style={styles.emailText}>{clientData?.email}</Text>
+          <Text style={styles.dateText}>
+            {format(new Date(), 'EEEE, MMMM d, yyyy')}
+          </Text>
+        </View>
+        </LinearGradient>
 
       {/* Quick Stats */}
       <View style={styles.statsContainer}>
@@ -343,7 +350,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
           <Icon name="trending-up-outline" size={24} color="#6A0DAD" />
           <Text style={styles.statTitle}>Monthly Usage</Text>
           <Text style={styles.statValue}>
-            {calculateMonthlyUsage().toFixed(2)}L
+            ${calculateMonthlyUsage().toFixed(2)}
           </Text>
         </View>
       </View>
@@ -358,12 +365,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>TIN Number:</Text>
           <Text style={styles.detailValue}>{clientData?.tinNumber}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Total Fuel:</Text>
-          <Text style={styles.detailValue}>
-            {clientData?.totalFuelPurchased?.toLocaleString()}L
-          </Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Total Value:</Text>
@@ -388,15 +389,15 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
               <Icon name="bar-chart-outline" size={24} color="#6A0DAD" />
               <Text style={styles.summaryLabel}>Monthly Usage</Text>
               <Text style={styles.summaryValue}>
-                {calculateMonthlyUsage().toFixed(2)} L
+                ${calculateMonthlyUsage().toFixed(2)}
                 </Text>
               </View>
             <View style={styles.summaryItem}>
               <Icon name="trending-up-outline" size={24} color="#6A0DAD" />
-              <Text style={styles.summaryLabel}>Efficiency</Text>
+              <Text style={styles.summaryLabel}>Average Price</Text>
               <Text style={styles.summaryValue}>
                 {clientData?.totalValue && clientData?.totalFuelPurchased ? 
-                  (clientData.totalValue / clientData.totalFuelPurchased).toFixed(2) : '0'} $/L
+                  `$${(clientData.totalValue / clientData.totalFuelPurchased).toFixed(2)}` : '$0'}
               </Text>
             </View>
           </View>
@@ -424,7 +425,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
         <Text style={styles.priceText}>Diesel: ${pumpPrices.diesel}/L</Text>
         <Text style={styles.priceText}>Petrol: ${pumpPrices.petrol}/L</Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 

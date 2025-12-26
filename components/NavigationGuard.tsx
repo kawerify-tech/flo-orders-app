@@ -3,6 +3,7 @@ import { useRouter, usePathname } from 'expo-router';
 import { BackHandler, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../lib/AuthContext';
+import { LEGAL } from '../lib/legal';
 
 /**
  * Navigation Guard Component
@@ -18,6 +19,20 @@ export function NavigationGuard() {
     // Prevent going back to signin when signed in
     const checkAuthState = async () => {
       try {
+        // Enforce legal acceptance gate for all users
+        const acceptanceRaw = await AsyncStorage.getItem(LEGAL.acceptanceStorageKey);
+        const acceptance = acceptanceRaw ? JSON.parse(acceptanceRaw) : null;
+        const isLegalAccepted = Boolean(acceptance && acceptance.agreementId === LEGAL.agreementId);
+
+        const isAllowedWithoutAcceptance =
+          pathname === '/terms-acceptance' ||
+          pathname?.startsWith('/legal');
+
+        if (!isLegalAccepted && !isAllowedWithoutAcceptance) {
+          router.replace('/terms-acceptance' as any);
+          return;
+        }
+
         const isSignedIn = await AsyncStorage.getItem('isSignedIn');
         
         // If user is signed in and tries to access signin/welcome screens, redirect
