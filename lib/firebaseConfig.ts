@@ -1,11 +1,24 @@
 // firebaseConfig.ts
 import { initializeApp } from 'firebase/app';
 import { createUserWithEmailAndPassword, getAuth, initializeAuth } from 'firebase/auth';
-import { getReactNativePersistence } from 'firebase/auth/react-native';
 import { getFirestore, collection, getDocs, addDoc, updateDoc, query, where, orderBy, limit, startAfter, doc, runTransaction } from 'firebase/firestore';
 import { getDatabase, ref, onValue, push, set, serverTimestamp, update, onDisconnect, get, child } from 'firebase/database';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const reactNativePersistence: any = {
+  type: 'LOCAL',
+  _isAvailable: async () => true,
+  _set: async (key: string, value: string) => {
+    await AsyncStorage.setItem(key, value);
+  },
+  _get: async (key: string) => {
+    return await AsyncStorage.getItem(key);
+  },
+  _remove: async (key: string) => {
+    await AsyncStorage.removeItem(key);
+  },
+};
 
 // Firebase configuration object
 const firebaseConfig = {
@@ -27,7 +40,7 @@ const db = getFirestore(app);
 const auth = Platform.OS === 'web'
   ? getAuth(app)
   : initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
+      persistence: reactNativePersistence,
     });
 let messaging: any = null;
 let getToken: any = null;
