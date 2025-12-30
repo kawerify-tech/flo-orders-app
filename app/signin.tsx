@@ -9,7 +9,7 @@ import { auth, db } from '../lib/firebaseConfig';
 import { colors, responsive, commonStyles } from '../constants/theme';
 import { useBreakpoint } from '../constants/breakpoints';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getDeviceInfo, getLocationInfo, getIPAddress } from '../utils/deviceTracking';
+import { getDeviceInfo, getIPAddress } from '../utils/deviceTracking';
 import { useAuth } from '../lib/AuthContext';
 
 const SignInScreen = () => {
@@ -115,15 +115,11 @@ const SignInScreen = () => {
       await AsyncStorage.setItem('isSignedIn', 'true');
 
       try {
-        // Get comprehensive device and location information with timeout
+        // Get device and IP audit information with timeout
         const auditPromise = Promise.race([
           Promise.all([
             getDeviceInfo().catch(err => {
               console.warn('Error getting device info:', err);
-              return null;
-            }),
-            getLocationInfo().catch(err => {
-              console.warn('Error getting location info:', err);
               return null;
             }),
             getIPAddress().catch(err => {
@@ -134,9 +130,9 @@ const SignInScreen = () => {
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Audit timeout')), 5000)
           ),
-        ]) as Promise<[any, any, string | null]>;
+        ]) as Promise<[any, string | null]>;
 
-        const [deviceInfo, locationInfo, ipAddress] = await auditPromise.catch(() => [null, null, null]);
+        const [deviceInfo, ipAddress] = await auditPromise.catch(() => [null, null]);
 
         // Store device info locally for security checks (non-blocking)
         if (deviceInfo) {
@@ -146,16 +142,9 @@ const SignInScreen = () => {
             console.warn('Error storing device info:', e);
           }
         }
-        if (locationInfo) {
-          try {
-            await AsyncStorage.setItem('lastLocation', JSON.stringify(locationInfo));
-          } catch (e) {
-            console.warn('Error storing location:', e);
-          }
-        }
 
-        // Record login audit with full device and location data (non-blocking)
-        if (deviceInfo || locationInfo || ipAddress) {
+        // Record login audit with device and IP data (non-blocking)
+        if (deviceInfo || ipAddress) {
           try {
             await Promise.race([
               addDoc(collection(db, 'loginAudits'), {
@@ -163,7 +152,7 @@ const SignInScreen = () => {
                 email: (user.email || email.trim() || '').toLowerCase(),
                 ipAddress: ipAddress || null,
                 deviceInfo: deviceInfo || null,
-                location: locationInfo || null,
+                location: null,
                 timestamp: new Date().toISOString(),
                 createdAt: serverTimestamp(),
               }),
@@ -185,7 +174,7 @@ const SignInScreen = () => {
               to: 'contact@kawerifytech.com',
               message: {
                 subject: 'New Sign-in Alert - Flo Orders',
-                text: `A sign-in occurred for ${(user.email || email.trim() || '').toLowerCase()}\n\nDevice: ${deviceInfo?.deviceModel || deviceInfo?.platform || 'Unknown'} (${deviceInfo?.platformVersion || 'Unknown'})\nIP: ${ipAddress || 'Unknown'}\nLocation: ${locationInfo?.address || (locationInfo?.latitude && locationInfo?.longitude ? `${locationInfo.latitude}, ${locationInfo.longitude}` : 'Unknown')}\nTimestamp: ${new Date().toLocaleString()}\n`,
+                text: `A sign-in occurred for ${(user.email || email.trim() || '').toLowerCase()}\n\nDevice: ${deviceInfo?.deviceModel || deviceInfo?.platform || 'Unknown'} (${deviceInfo?.platformVersion || 'Unknown'})\nIP: ${ipAddress || 'Unknown'}\nTimestamp: ${new Date().toLocaleString()}\n`,
               },
               createdAt: serverTimestamp(),
             }),

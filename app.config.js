@@ -18,7 +18,8 @@ module.exports = {
     ],
     android: {
       package: "com.floorders.floorders",
-      versionCode: 4,
+      versionCode: 5,
+      icon: "./assets/images/favicon.png",
       adaptiveIcon: {
         foregroundImage: "./assets/images/favicon.png",
         backgroundColor: "#ffffff"
@@ -34,7 +35,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.floorders",
-      buildNumber: "4",
+      buildNumber: "5",
       googleServicesFile: "./app/GoogleService-Info.plist",
       deploymentTarget: "15.1",
       requireFullScreen: false,
@@ -71,7 +72,6 @@ module.exports = {
         },
         // Permission usage descriptions - REQUIRED for App Store if permissions are requested
         NSUserNotificationsUsageDescription: "We need notification permissions to send you important updates about your fuel orders and transactions.",
-        NSLocationWhenInUseUsageDescription: "We need your location to enhance account security and detect unauthorized access to your account.",
         CFBundleURLTypes: [
           {
             CFBundleURLName: "com.floorders",
@@ -99,11 +99,11 @@ module.exports = {
         {
           ios: {
             deploymentTarget: "15.1",
-            newArchEnabled: true,
+            newArchEnabled: false,
             flipper: false
           },
           android: {
-            newArchEnabled: true,
+            newArchEnabled: false,
             compileSdkVersion: 35,
             targetSdkVersion: 35,
             minSdkVersion: 24
@@ -114,7 +114,6 @@ module.exports = {
       "expo-router",
       "expo-web-browser",
       "expo-splash-screen",
-      "expo-location",
       "expo-notifications"
     ],
     extra: {

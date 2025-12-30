@@ -2,14 +2,7 @@ import { Platform, Dimensions } from 'react-native';
 import Constants from 'expo-constants';
 
 // Dynamic imports to handle missing packages gracefully
-let Location: any = null;
 let Device: any = null;
-
-try {
-  Location = require('expo-location');
-} catch (e) {
-  console.warn('expo-location not available');
-}
 
 try {
   Device = require('expo-device');
@@ -37,15 +30,6 @@ export interface DeviceInfo {
   osVersion: string | null;
 }
 
-export interface LocationInfo {
-  latitude: number | null;
-  longitude: number | null;
-  accuracy: number | null;
-  altitude: number | null;
-  address: string | null;
-  timestamp: string;
-}
-
 /**
  * Get comprehensive device information
  */
@@ -71,94 +55,6 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
     osName: (Device as any)?.osName || Platform.OS || null,
     osVersion: (Device as any)?.osVersion || String(Platform.Version) || null,
   };
-}
-
-/**
- * Get current location with reverse geocoding
- */
-export async function getLocationInfo(): Promise<LocationInfo> {
-  if (!Location) {
-    console.warn('expo-location not available');
-    return {
-      latitude: null,
-      longitude: null,
-      accuracy: null,
-      altitude: null,
-      address: null,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  try {
-    // Check if location services are enabled
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    
-    if (status !== 'granted') {
-      console.warn('Location permission not granted');
-      return {
-        latitude: null,
-        longitude: null,
-        accuracy: null,
-        altitude: null,
-        address: null,
-        timestamp: new Date().toISOString(),
-      };
-    }
-
-    // Get current location with timeout
-    const location = await Promise.race([
-      Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 10000,
-      }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Location timeout')), 10000)
-      ),
-    ]) as any;
-
-    let address: string | null = null;
-    
-    try {
-      // Reverse geocode to get address
-      const reverseGeocode = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-
-      if (reverseGeocode && reverseGeocode.length > 0) {
-        const addr = reverseGeocode[0];
-        const parts = [
-          addr.street,
-          addr.streetNumber,
-          addr.city,
-          addr.region,
-          addr.country,
-        ].filter(Boolean);
-        address = parts.join(', ') || null;
-      }
-    } catch (error) {
-      console.warn('Reverse geocoding failed:', error);
-    }
-
-    return {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-      accuracy: location.coords.accuracy || null,
-      altitude: location.coords.altitude || null,
-      address,
-      timestamp: new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error('Error getting location:', error);
-    return {
-      latitude: null,
-      longitude: null,
-      accuracy: null,
-      altitude: null,
-      address: null,
-      timestamp: new Date().toISOString(),
-    };
-  }
 }
 
 /**

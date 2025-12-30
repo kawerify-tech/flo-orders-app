@@ -7,8 +7,6 @@ import {
   StyleSheet,
   Alert,
   Linking,
-  Platform,
-  PermissionsAndroid,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -95,55 +93,8 @@ const TermsAcceptanceScreen = () => {
         console.warn('Error requesting notification permission:', notifError);
       }
 
-      // Request storage permissions
-      if (Platform.OS === 'android') {
-        try {
-          // Request storage permissions for Android 13+ (API 33+)
-          if (Platform.Version >= 33) {
-            const readMediaImages = await PermissionsAndroid.request(
-              PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
-            );
-            const readMediaVideo = await PermissionsAndroid.request(
-              PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO
-            );
-            if (__DEV__) {
-              console.log('Media permissions:', { readMediaImages, readMediaVideo });
-            }
-          } else {
-            // For Android 12 and below, request legacy storage permissions
-            const readStorage = await PermissionsAndroid.request(
-              PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-              {
-                title: 'Storage Permission',
-                message: 'Flo Orders needs access to your storage to save PDF reports.',
-                buttonNeutral: 'Ask Me Later',
-                buttonNegative: 'Cancel',
-                buttonPositive: 'OK',
-              }
-            );
-            const writeStorage = await PermissionsAndroid.request(
-              PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-              {
-                title: 'Storage Permission',
-                message: 'Flo Orders needs access to your storage to save PDF reports.',
-                buttonNeutral: 'Ask Me Later',
-                buttonNegative: 'Cancel',
-                buttonPositive: 'OK',
-              }
-            );
-            if (__DEV__) {
-              console.log('Storage permissions:', { readStorage, writeStorage });
-            }
-          }
-        } catch (error) {
-          console.warn('Storage permission request failed:', error);
-        }
-      }
-      // Note: On iOS, file system operations use app-specific directories
-      // that don't require explicit permissions
-
-      // Note: Internet/mobile data permission is automatically granted on both platforms
-      // The app will work without storage permissions, but PDF saving may be limited
+      // Note: Storage/media permissions are intentionally not requested here.
+      // The app can use app-scoped storage and sharing APIs without broad storage access.
     } catch (error) {
       console.error('Error requesting permissions:', error);
     }
