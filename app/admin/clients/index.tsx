@@ -31,18 +31,19 @@ import {
   arrayUnion,
 } from "firebase/firestore";
 import { 
-  getAuth, 
   createUserWithEmailAndPassword, 
   updateEmail, 
   updatePassword,
+  signOut,
   EmailAuthProvider,
   reauthenticateWithCredential
 } from "firebase/auth";
-import { db } from "../../../lib/firebaseConfig";
+import { auth, db, getSecondaryAuth } from "../../../lib/firebaseConfig";
 import Icon from "react-native-vector-icons/Ionicons"; // Import Ionicons for FAB
 import { showMessage } from "react-native-flash-message";
 import Modal from 'react-native-modal';
 import { useRouter } from 'expo-router';
+import { SafeAreaLayout } from '../../../components/SafeAreaLayout';
 
 // Define the type for client data
 type ClientData = {
@@ -199,7 +200,6 @@ const ClientsScreen = () => {
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [hasMoreClients, setHasMoreClients] = useState<boolean>(true); // Track if there are more clients to load
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
-  const auth = getAuth(); // Initialize Firebase Auth
 
   // Add this new state in ClientsScreen component
   const [isTopupModalVisible, setIsTopupModalVisible] = useState(false);
@@ -500,11 +500,18 @@ const ClientsScreen = () => {
       setLoading(true);
       
       // First create the authentication account
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const secondaryAuth = getSecondaryAuth();
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
       const userId = userCredential.user.uid;
+
+      // Ensure we do not keep the secondary session signed in
+      try {
+        await signOut(secondaryAuth);
+      } catch {
+        // best-effort
+      }
       
-      // Generate a document ID based on name
-      const docId = generateDocumentId(name);
+      const docId = userId;
       
       // Prepare client data
       const newClientData = {
@@ -514,14 +521,7 @@ const ClientsScreen = () => {
         updatedAt: serverTimestamp(),
       };
 
-      // Create the document with custom ID
-      try {
-        await setDoc(doc(db, "clients", docId), newClientData);
-      } catch (docError) {
-        console.error("Error creating document with custom ID:", docError);
-        // If that fails, fall back to auto-generated ID
-        await addDoc(collection(db, "clients"), newClientData);
-      }
+      await setDoc(doc(db, "clients", docId), newClientData);
       
       // Add the new client to the list without refetching
       const newClientSummary: ClientSummary = {
@@ -676,11 +676,10 @@ const ClientsScreen = () => {
       }
       
       const currentData = currentDoc.data() as ClientData;
-      const auth = getAuth();
       const user = auth.currentUser;
       
       if (!user) {
-        throw new Error("Authentication required");
+        throw new Error('No authenticated user found');
       }
 
       // If email or password changed, we need to re-authenticate
@@ -943,11 +942,10 @@ const ClientsScreen = () => {
   const handleTopupSubmit = async (clientId: string, amount: number) => {
     try {
       setLoading(true);
-      const auth = getAuth();
       const adminUser = auth.currentUser;
       
       if (!adminUser) {
-        throw new Error('Authentication required');
+        throw new Error('No admin user found');
       }
 
       // Get client reference and data
@@ -1131,49 +1129,51 @@ const ClientsScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Clients Management</Text>
-        <View style={styles.searchContainer}>
-          <Icon name="search" size={20} color="#6c757d" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search clients..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={handleAddNewClient}
-        >
-          <Icon name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add Client</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.contentContainer}>
-        <View style={styles.listContainer}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#6A0DAD" />
-            </View>
-          ) : clients.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No clients found</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={clients}
-              renderItem={renderClientItem}
-              keyExtractor={(item) => item.id}
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.5}
-              ListFooterComponent={renderFooter}
+    <SafeAreaLayout>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Clients Management</Text>
+          <View style={styles.searchContainer}>
+            <Icon name="search" size={20} color="#6c757d" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search clients..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
-          )}
+          </View>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={handleAddNewClient}
+          >
+            <Icon name="add" size={20} color="#fff" />
+            <Text style={styles.addButtonText}>Add Client</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+
+        <View style={styles.contentContainer}>
+          <View style={styles.listContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#6A0DAD" />
+              </View>
+            ) : clients.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No clients found</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={clients}
+                renderItem={renderClientItem}
+                keyExtractor={(item) => item.id}
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={renderFooter}
+                style={styles.list}
+              />
+            )}
+          </View>
+        </View>
 
       {/* Modal for Adding/Editing Clients */}
       <Modal
@@ -1224,16 +1224,17 @@ const ClientsScreen = () => {
         </View>
       </Modal>
 
-      <TopupModal
-        client={selectedClientForTopup}
-        isVisible={isTopupModalVisible}
-        onClose={() => {
-          setIsTopupModalVisible(false);
-          setSelectedClientForTopup(null);
-        }}
-        onSubmit={handleTopupSubmit}
-      />
-    </View>
+        <TopupModal
+          client={selectedClientForTopup}
+          isVisible={isTopupModalVisible}
+          onClose={() => {
+            setIsTopupModalVisible(false);
+            setSelectedClientForTopup(null);
+          }}
+          onSubmit={handleTopupSubmit}
+        />
+      </View>
+    </SafeAreaLayout>
   );
 };
 
@@ -1241,12 +1242,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
-    padding: 20,
+    padding: 0,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 20,
+    marginHorizontal: 20,
     marginBottom: 20,
     padding: 15,
     backgroundColor: '#fff',
@@ -1311,6 +1314,8 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     gap: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
   },
   listContainer: {
     flex: 1,
@@ -1467,6 +1472,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#6A0DAD',
+  },
+  list: {
+    flex: 1,
   },
   vehicleContainer: {
     marginBottom: 15,

@@ -1,124 +1,127 @@
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
+ rules_version = '2'; 
+ service cloud.firestore {
+   match /databases/{database}/documents {
 
-    // Helper function to check if user is signed in
-    function isSignedIn() {
-      return request.auth != null;
-    }
+     function isSignedIn() {
+       return request.auth != null;
+     }
 
-    // Helper function to check if the user is the owner of a document based on email
-    function isOwner(email) {
-      return isSignedIn() && request.auth.token.email == email;
-    }
+     function isAdmin() {
+       return isSignedIn() && request.auth.token.role == "admin";
+     }
 
-    // Helper function to check if the user is an admin
-    function isAdmin() {
-      return isSignedIn() && request.auth.token.role == "admin";
-    }
+     function isAttendant() {
+       return isSignedIn() && exists(/databases/$(database)/documents/attendants/$(request.auth.uid));
+     }
 
-    // Helper function to check if the user is an attendant
-    function isAttendant() {
-      return isSignedIn() && exists(/databases/$(database)/documents/attendants/$(request.auth.uid));
-    }
+     // Used for subcollections where resource is not the client document.
+     function isClientOwner(clientId) {
+       return isSignedIn() && (
+         get(/databases/$(database)/documents/clients/$(clientId)).data.email == request.auth.token.email
+         || get(/databases/$(database)/documents/clients/$(clientId)).data.uid == request.auth.uid
+       );
+     }
 
-    function isValidEmail() {
-      return request.auth.token.email.matches('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$');
-    }
+     function isValidTransactionUpdate() {
+       return isAttendant() && 
+              request.resource.data.status in ['completed', 'rejected'] &&
+              request.resource.data.attendantId == request.auth.uid;
+     }
 
-    function isValidPhone() {
-      return request.resource.data.phone.matches('^\\+?[1-9]\\d{1,14}$');
-    }
+     match /{collection}/{docId} {
+       allow read, write: if isSignedIn();
+     }
 
-    // General rule for signed-in users to access any collection (development)
-    match /{collection}/{docId} {
-      allow read, write: if isSignedIn();
-    }
+     match /admins/{docId} {
+       allow read, write: if isAdmin();
+     }
 
-    // Admin rules - Admins can read/write everything
-    match /admins/{docId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin() && isValidEmail();
-    }
-
-    // Attendants can manage their own data or if they are an admin
-    match /attendants/{attendantId} {
+     match /attendants/{attendantId} {
       allow read: if isSignedIn();
-      allow create: if isAdmin() && isValidEmail() && isValidPhone();
-      allow update: if isAttendant() && request.auth.uid == attendantId || isAdmin();
-      allow delete: if isAdmin();
-      
-      // Attendant's transactions subcollection
-      match /transactions/{transactionId} {
-        allow read: if isAttendant() && request.auth.uid == attendantId || isAdmin();
-        allow write: if isAttendant() && request.auth.uid == attendantId || isAdmin();
-      }
+      allow list: if isSignedIn() && request.query.limit <= 1;
+      // Needed for attendant Settings screen (getDoc + setDoc merge)
+      allow update: if isAdmin() || (
+        isSignedIn() && (
+          request.auth.uid == attendantId
+          || resource.data.email == request.auth.token.email
+          || resource.data.uid == request.auth.uid
+        )
+      );
+      allow create, delete: if isAdmin();
 
-      // Attendant's notifications subcollection
-      match /notifications/{notificationId} {
-        allow read: if isAttendant() && request.auth.uid == attendantId || isAdmin();
-        allow create: if isAdmin();
-        allow update: if isAttendant() && request.auth.uid == attendantId;
-      }
+       match /transactions/{transactionId} {
+         allow create: if isAttendant();
+         allow read, update: if (isAttendant() && request.auth.uid == attendantId) || isAdmin();
+         allow update: if isAttendant() && isValidTransactionUpdate();
+       }
 
-      // Attendant's messages subcollection
-      match /messages/{messageId} {
-        allow read: if isAttendant() && request.auth.uid == attendantId || isAdmin();
-        allow create: if isAttendant() && request.auth.uid == attendantId || isAdmin();
-      }
-    }
+       match /notifications/{notificationId} {
+         allow create, read: if (isAttendant() && request.auth.uid == attendantId) || isAdmin();
+         allow update: if isAttendant();
+       }
 
-    // Client rules - Clients can access their own data
-    match /clients/{clientId} {
-      allow read: if isSignedIn() && (isOwner(clientId) || isAdmin() || isAttendant());
-      allow create: if isAdmin() && isValidEmail() && isValidPhone();
-      allow update: if isSignedIn() && (isOwner(clientId) || isAdmin());
-      allow delete: if isAdmin();
-      
-      // Client's transactions subcollection
-      match /transactions/{transactionId} {
-        allow read: if isSignedIn() && (isOwner(clientId) || isAdmin() || isAttendant());
-        allow create: if isSignedIn() && isOwner(clientId);
-        allow update: if isAttendant() || isAdmin();
-      }
+       match /messages/{messageId} {
+         allow create, read, update, delete: if (isAttendant() && request.auth.uid == attendantId) || isAdmin();
+         allow create, read, update, delete: if isAdmin() && exists(/databases/$(database)/documents/attendants/$(request.resource.data.receiverId));
+       }
+     }
 
-      // Client's drafts subcollection
-      match /drafts/{draftId} {
-        allow read, write: if isSignedIn() && (isOwner(clientId) || isAdmin());
-      }
+     match /clients/{clientId} {
+       // Owner check for the client document itself (no get() recursion)
+       allow read, write: if isSignedIn() && (
+         (resource.data.email == request.auth.token.email || resource.data.uid == request.auth.uid)
+         || isAdmin()
+         || isAttendant()
+       );
 
-      // Client's notifications subcollection
-      match /notifications/{notificationId} {
-        allow read: if isSignedIn() && (isOwner(clientId) || isAdmin());
-        allow create: if isAdmin();
-        allow update: if isSignedIn() && isOwner(clientId);
-      }
-    }
+       match /transactions/{transactionId} {
+         // Client creates the copy in their own subcollection as part of the batch
+         allow create: if isAttendant() || isClientOwner(clientId);
+         allow read, update: if isSignedIn() && (isClientOwner(clientId) || isAdmin() || isAttendant());
+         allow update: if isAttendant() && isValidTransactionUpdate();
+       }
 
-    // Global rules for transactions and notifications
-    match /transactions/{transactionId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isAttendant() || isAdmin();
-      allow delete: if isAdmin();
-    }
+       match /drafts/{draftId} {
+         // Fix drafts loading for the client
+         allow read, write: if isSignedIn() && (isClientOwner(clientId) || isAdmin());
+       }
 
-    match /notifications/{notificationId} {
-      allow read: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isSignedIn();
-      allow delete: if isAdmin();
-    }
+       match /notifications/{notificationId} {
+         allow read, write: if isSignedIn() && (isClientOwner(clientId) || isAdmin());
+       }
+     }
 
-    // Transaction updates validation function
-    function isValidTransactionUpdate() {
-      return request.resource.data.status in ['completed', 'rejected'] &&
-             request.resource.data.attendantId == request.auth.uid;
-    }
+     match /transactions/{transactionId} {
+       // Fix: allow clients to create their own pending transactions (app writes to /transactions)
+       allow create: if isAttendant() || (
+         isSignedIn()
+         && request.resource.data.status == 'pending'
+         && request.resource.data.clientId is string
+         && isClientOwner(request.resource.data.clientId)
+         && request.resource.data.clientEmail == request.auth.token.email
+       );
 
-    // Apply the isValidTransactionUpdate check where appropriate (e.g., updating transaction status)
-    match /transactions/{transactionId} {
-      allow update: if isValidTransactionUpdate();
-    }
-  }
-}
+       // Fix: clients can read only their own transactions (app queries by clientEmail)
+       allow read: if isAdmin() || isAttendant() || (
+         isSignedIn() && resource.data.clientEmail == request.auth.token.email
+       );
+
+       allow update: if isAttendant() && isValidTransactionUpdate();
+     }
+
+     match /notifications/{notificationId} {
+       allow update: if isAttendant();
+       allow read: if isSignedIn();
+       allow write: if isSignedIn() && (isAdmin() || request.auth.uid == get(/databases/$(database)/documents/notifications/$(notificationId)).data.clientId);
+     }
+
+     match /prices/{priceId} {
+       allow read: if isAttendant() || isAdmin();
+       allow write: if isAdmin();
+     }
+
+     match /transactions/{transactionId} {
+       allow update: if isValidTransactionUpdate();
+     }
+   }
+ }

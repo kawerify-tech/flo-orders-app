@@ -14,6 +14,10 @@ import Modal from 'react-native-modal';
 import { useLocalSearchParams } from 'expo-router';
 import { ViewStyle, TextStyle, ImageStyle } from 'react-native';
 import { SafeAreaLayout } from '../../../components/SafeAreaLayout';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { commonStyles, colors, responsive } from '../../../constants/theme';
+import { handleAppError, showUserError, showUserSuccess } from '../../../utils/userFacingError';
 
 type FetchClientDetails = (id: string) => Promise<void>;
 
@@ -147,17 +151,21 @@ const ClientDetails = () => {
 
       // Load notifications
       if (clientData?.id) {
-        const notificationsRef = collection(db, 'notifications');
-        const notificationsQuery = query(
-          notificationsRef,
-          where('clientId', '==', clientData.id),
-          orderBy('timestamp', 'desc')
-        );
+        const notificationsRef = collection(doc(db, 'clients', clientData.id), 'notifications');
+        const notificationsQuery = query(notificationsRef, orderBy('createdAt', 'desc'));
         const notificationsSnapshot = await getDocs(notificationsQuery);
-        const notificationsData = notificationsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Notification[];
+        const notificationsData = notificationsSnapshot.docs.map((nDoc) => {
+          const data = nDoc.data() as any;
+          return {
+            id: nDoc.id,
+            clientId: data.clientId,
+            clientName: data.clientName,
+            message: data.message,
+            status: data.status || 'pending',
+            timestamp: data.createdAt,
+            type: data.type || 'system',
+          } as Notification;
+        });
         setNotifications(notificationsData);
       }
 
@@ -232,22 +240,21 @@ const ClientDetails = () => {
 
       // 3. Fetch all notifications for this client
       console.log('Fetching notifications...');
-      const notificationsRef = collection(db, 'notifications');
-      const notificationsQuery = query(
-        notificationsRef,
-        where('clientId', '==', id),
-        orderBy('timestamp', 'desc')
-      );
+      const notificationsRef = collection(doc(db, 'clients', id), 'notifications');
+      const notificationsQuery = query(notificationsRef, orderBy('createdAt', 'desc'));
       const notificationsSnapshot = await getDocs(notificationsQuery);
-      const notificationsData = notificationsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        clientId: doc.data().clientId,
-        clientName: doc.data().clientName,
-        message: doc.data().message,
-        status: doc.data().status,
-        timestamp: doc.data().timestamp,
-        type: doc.data().type
-      })) as Notification[];
+      const notificationsData = notificationsSnapshot.docs.map((nDoc) => {
+        const data = nDoc.data() as any;
+        return {
+          id: nDoc.id,
+          clientId: data.clientId,
+          clientName: data.clientName,
+          message: data.message,
+          status: data.status || 'pending',
+          timestamp: data.createdAt,
+          type: data.type || 'system',
+        } as Notification;
+      });
       console.log('Notifications fetched:', notificationsData.length);
       setNotifications(notificationsData);
 
@@ -364,14 +371,22 @@ const ClientDetails = () => {
       orderBy('timestamp', 'desc')
     );
 
-    const unsubscribe = onSnapshot(transactionsQuery, (snapshot) => {
-      const updatedTransactions = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Transaction[];
-      setTransactions(updatedTransactions);
-      setFilteredTransactions(updatedTransactions);
-    });
+    const unsubscribe = onSnapshot(
+      transactionsQuery,
+      (snapshot) => {
+        const updatedTransactions = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Transaction[];
+        setTransactions(updatedTransactions);
+        setFilteredTransactions(updatedTransactions);
+      },
+      (error) => {
+        console.error('Error subscribing to transactions:', error);
+        setTransactions([]);
+        setFilteredTransactions([]);
+      }
+    );
 
     return () => unsubscribe();
   }, [clientData?.id]);
@@ -420,20 +435,31 @@ const ClientDetails = () => {
   useEffect(() => {
     if (!clientData?.id) return;
 
-    const notificationsRef = collection(db, 'notifications');
-    const notificationsQuery = query(
-      notificationsRef,
-      where('clientId', '==', clientData.id),
-      orderBy('timestamp', 'desc')
-    );
+    const notificationsRef = collection(doc(db, 'clients', clientData.id), 'notifications');
+    const notificationsQuery = query(notificationsRef, orderBy('createdAt', 'desc'));
 
-    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
-      const updatedNotifications = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Notification[];
-      setNotifications(updatedNotifications);
-    });
+    const unsubscribe = onSnapshot(
+      notificationsQuery,
+      (snapshot) => {
+        const updatedNotifications = snapshot.docs.map((nDoc) => {
+          const data = nDoc.data() as any;
+          return {
+            id: nDoc.id,
+            clientId: data.clientId,
+            clientName: data.clientName,
+            message: data.message,
+            status: data.status || 'pending',
+            timestamp: data.createdAt,
+            type: data.type || 'system',
+          } as Notification;
+        });
+        setNotifications(updatedNotifications);
+      },
+      (error) => {
+        console.error('Error subscribing to notifications:', error);
+        setNotifications([]);
+      }
+    );
 
     return () => unsubscribe();
   }, [clientData?.id]);
@@ -809,8 +835,15 @@ const ClientDetails = () => {
         type: 'topup'
       };
 
-      // Add topup notification to Firestore
-      const topupRef = await addDoc(collection(db, 'notifications'), topupNotification);
+      // Add topup notification to the client's notifications subcollection
+      const topupRef = await addDoc(collection(doc(db, 'clients', clientData.id), 'notifications'), {
+        clientId: clientData.id,
+        clientName: clientData.name,
+        message: topupNotification.message,
+        createdAt: serverTimestamp(),
+        type: 'topup',
+        read: false,
+      });
 
       // Update client balance
       await updateDoc(doc(db, 'clients', clientData.id), {
@@ -911,12 +944,12 @@ const ClientDetails = () => {
 
   const handleTransactionSubmit = async () => {
     if (!transactionForm.vehicle || !transactionForm.fuelType || !transactionForm.litres || !transactionForm.amount) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      showUserError('Please fill in all required fields.');
       return;
     }
 
     if (!clientData?.id || !clientData?.name || !clientData?.email) {
-      Alert.alert('Error', 'Client information is incomplete');
+      showUserError('Client information is incomplete.');
       return;
     }
 
@@ -962,10 +995,12 @@ const ClientDetails = () => {
         comment: ''
       });
       
-      Alert.alert('Success', 'Transaction created successfully');
+      showUserSuccess('Transaction created successfully');
     } catch (error) {
-      console.error('Error creating transaction:', error);
-      Alert.alert('Error', 'Failed to create transaction');
+      handleAppError(error, {
+        context: 'Error creating transaction:',
+        userMessage: 'Could not create the transaction right now. Please try again.',
+      });
     } finally {
       setLoading(false);
     }

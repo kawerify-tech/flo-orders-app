@@ -45,7 +45,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <NavigationGuard />
-          <StatusBar style="light" backgroundColor="transparent" translucent={true} />
+          <StatusBar style="auto" backgroundColor="#F5F5F5" translucent={false} />
           <Stack>
             <Stack.Screen name="terms-acceptance" options={{ headerShown: false }} />
             <Stack.Screen name="legal/user-agreement" options={{ headerShown: false }} />

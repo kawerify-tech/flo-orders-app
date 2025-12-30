@@ -81,10 +81,12 @@ const AdminChat: React.FC<Props> = ({ attendantId, attendantName }) => {
 
     return () => {
       connectedListener();
-      update(adminStatusRef, {
-        status: 'offline',
-        lastSeen: serverTimestamp()
-      }).catch(console.error);
+      if (auth.currentUser?.uid === currentUser.uid) {
+        update(adminStatusRef, {
+          status: 'offline',
+          lastSeen: serverTimestamp()
+        }).catch(console.error);
+      }
     };
   }, [currentUser]);
 

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, ScrollView, SafeAreaView, Text, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, Text, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { List, Switch, Button, Divider } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { DataDeletionService } from '../../utils/dataDeletion';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { db, auth } from '../../lib/firebaseConfig';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../../lib/AuthContext';
+import { commonStyles } from '../../constants/theme';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
 
 interface ClientData {
   id?: string;
@@ -53,9 +55,9 @@ export default function Settings() {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (!isMounted) return;
 
-      if (user?.email) {
+      if (user?.uid && user?.email) {
         console.log('Fetching profile data for:', user.email);
-        fetchClientData(user.email);
+        fetchClientData(user.uid, user.email);
       } else {
         console.log('No authenticated user');
         setLoading(false);
@@ -70,18 +72,34 @@ export default function Settings() {
     };
   }, []);
 
-  const fetchClientData = async (email: string) => {
-    if (!email) {
+  const fetchClientData = async (uid: string, email: string) => {
+    if (!uid || !email) {
       setLoading(false);
       return;
     }
 
     try {
-      const clientsRef = collection(db, 'clients');
-      const q = query(clientsRef, where('email', '==', email.toLowerCase()));
-      const querySnapshot = await getDocs(q);
+      const normalizedEmail = email.toLowerCase();
 
-      if (querySnapshot.empty) {
+      let clientDocId = uid;
+      let data: any | null = null;
+
+      const clientRef = doc(db, 'clients', uid);
+      const clientSnap = await getDoc(clientRef);
+      if (clientSnap.exists()) {
+        data = clientSnap.data();
+      } else {
+        const clientsRef = collection(db, 'clients');
+        const q = query(clientsRef, where('email', '==', normalizedEmail), limit(1));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const found = querySnapshot.docs[0];
+          clientDocId = found.id;
+          data = found.data();
+        }
+      }
+
+      if (!data) {
         console.log('No client document found for email:', email);
         Alert.alert(
           'Account Not Found',
@@ -92,12 +110,9 @@ export default function Settings() {
         setLoading(false);
         return;
       }
-
-      const clientDoc = querySnapshot.docs[0];
-      const data = clientDoc.data();
       
       const formattedData: ClientData = {
-        id: clientDoc.id,
+        id: clientDocId,
         name: data.name || '',
         email: data.email || email,
         address: data.address || '',
@@ -134,8 +149,8 @@ export default function Settings() {
   const handleRefresh = () => {
     setLoading(true);
     const user = auth.currentUser;
-    if (user?.email) {
-      fetchClientData(user.email);
+    if (user?.uid && user?.email) {
+      fetchClientData(user.uid, user.email);
     } else {
       setLoading(false);
       Alert.alert('Error', 'Please login again');
@@ -377,19 +392,19 @@ export default function Settings() {
 
   if (!auth.currentUser) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaLayout>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.errorContainer}>
             <MaterialIcons name="error-outline" size={48} color="#FF5252" />
             <Text style={styles.errorText}>Please sign in to view your profile</Text>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </SafeAreaLayout>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaLayout contentStyle={{ backgroundColor: '#F5F5F5' }}>
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#6A0DAD" />
@@ -425,7 +440,6 @@ export default function Settings() {
                 {renderProfileItem('Name', clientData.name)}
                 {renderProfileItem('Email', clientData.email)}
                 {renderProfileItem('Balance', `$${clientData.balance.toFixed(2)}`)}
-                {renderProfileItem('Remaining Fuel', `${clientData.remainingFuel.toFixed(2)}L`)}
                 {renderProfileItem('Pump Price', `$${clientData.pumpPrice.toFixed(2)}/L`)}
               </View>
 
@@ -558,7 +572,7 @@ export default function Settings() {
       {/* Modals */}
       <PrivacyPolicyModal />
       <TermsOfServiceModal />
-    </SafeAreaView>
+    </SafeAreaLayout>
   );
 }
 
@@ -604,8 +618,9 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   scrollContent: {
+    flexGrow: 1,
     padding: 16,
-    paddingTop: 5,
+    paddingBottom: 32,
   },
   circle1: {
     position: 'absolute',
@@ -641,25 +656,15 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   profileCard: {
-    backgroundColor: '#FFF',
+    ...commonStyles.glassCard,
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
     marginBottom: 20,
   },
   settingsCard: {
-    backgroundColor: '#FFF',
+    ...commonStyles.glassCard,
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
     marginBottom: 20,
   },
   section: {

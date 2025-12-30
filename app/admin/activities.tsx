@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -27,8 +27,9 @@ import {
 import { db } from "../../lib/firebaseConfig";
 import Icon from "react-native-vector-icons/Ionicons";
 import { format, differenceInSeconds, differenceInMinutes, differenceInHours, differenceInDays } from "date-fns";
-import { showMessage } from "react-native-flash-message";
-import FlashMessage from "react-native-flash-message";
+import FlashMessage, { showMessage } from 'react-native-flash-message';
+import { commonStyles } from '../../constants/theme';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
 
 // Define the type for activity data
 type ActivityData = {
@@ -462,53 +463,64 @@ const ClientActivities = ({ clientId }: { clientId: string }) => {
   }, [activities]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Activity History</Text>
-      
-      {/* Filter buttons */}
-      {renderFilterButtons()}
-      
-      <FlatList
-        data={activities}
-        keyExtractor={(item) => item.id}
-        renderItem={renderActivityItem}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={["#6A0DAD"]}
-          />
-        }
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Icon name="alert-circle" size={48} color="#666" />
-            <Text style={styles.emptyText}>
-              {loading ? "Loading activities..." : 
-               refreshing ? "Refreshing activities..." :
-               "No activities found. Pull down to refresh."}
-            </Text>
-            <TouchableOpacity 
-              style={styles.retryButton}
-              onPress={handleRefresh}
-            >
-              <Text style={styles.retryText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
-      <FlashMessage position="top" />
-    </View>
+    <SafeAreaLayout>
+      <View style={styles.container}>
+        <FlatList
+          data={activities}
+          keyExtractor={(item) => item.id}
+          renderItem={renderActivityItem}
+          ListHeaderComponent={
+            <View style={styles.header}>
+              <Text style={styles.title}>Activity History</Text>
+              {renderFilterButtons()}
+            </View>
+          }
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={["#6A0DAD"]}
+            />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Icon name="alert-circle" size={48} color="#666" />
+              <Text style={styles.emptyText}>
+                {loading ? "Loading activities..." : 
+                 refreshing ? "Refreshing activities..." :
+                 "No activities found. Pull down to refresh."}
+              </Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={handleRefresh}
+              >
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          }
+        />
+        <FlashMessage position="top" />
+      </View>
+    </SafeAreaLayout>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: "#f5f5f5",
+  },
+  header: {
+    padding: 16,
+    paddingBottom: 0,
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   title: {
     fontSize: 24,

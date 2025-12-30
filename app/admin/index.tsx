@@ -6,6 +6,7 @@ import { db } from '../../lib/firebaseConfig';
 import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaLayout } from '../../components/SafeAreaLayout';
+import { commonStyles } from '../../constants/theme';
 
 // TypeScript interfaces
 interface Client {
@@ -173,7 +174,10 @@ const AdminHome = () => {
 
   return (
     <SafeAreaLayout>
-      <ScrollView style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Admin Dashboard</Text>
           <TouchableOpacity onPress={() => router.push('/admin/settings')}>
@@ -365,7 +369,11 @@ const AdminHome = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F5F5F5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 32,
   },
   loadingContainer: {
     flex: 1,
@@ -374,15 +382,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   header: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: '#6A0DAD',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#6A0DAD',
+    color: '#FFFFFF',
   },
   adminEmail: {
     fontSize: 16,
@@ -392,24 +402,20 @@ const styles = StyleSheet.create({
   metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 10,
+    paddingHorizontal: 20,
+    paddingTop: 16,
     justifyContent: 'space-between',
   },
   metricCard: {
     width: '48%',
-    backgroundColor: '#fff',
+    ...commonStyles.glassCard,
     padding: 15,
     borderRadius: 12,
     marginBottom: 15,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
   warningCard: {
-    backgroundColor: '#fff5f5',
+    backgroundColor: 'rgba(255, 245, 245, 0.7)',
   },
   metricValue: {
     fontSize: 24,
@@ -426,8 +432,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   section: {
+    marginHorizontal: 20,
     padding: 20,
-    backgroundColor: '#fff',
+    ...commonStyles.glassCard,
     marginVertical: 10,
   },
   sectionTitle: {

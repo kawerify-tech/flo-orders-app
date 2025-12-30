@@ -4,20 +4,13 @@ import { SafeAreaLayout } from '../components/SafeAreaLayout';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { addDoc, collection, query, where, getDocs, getDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, query, where, getDocs, getDoc, doc, serverTimestamp, limit } from 'firebase/firestore';
 import { auth, db } from '../lib/firebaseConfig';
 import { colors, responsive, commonStyles } from '../constants/theme';
 import { useBreakpoint } from '../constants/breakpoints';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDeviceInfo, getLocationInfo, getIPAddress } from '../utils/deviceTracking';
 import { useAuth } from '../lib/AuthContext';
-
-// Eye icon for visible password
-const EyeIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-    <path d="M12 4C7.03 4 3 7.67 3 12s4.03 8 9 8c4.97 0 9-3.67 9-8s-4.03-8-9-8zm0 14c-3.87 0-7-2.93-7-6s3.13-6 7-6c3.87 0 7 2.93 7 6s-3.13 6-7 6zm2.5-6.5c0 .83-.67 1.5-1.5 1.5S11.5 12.83 11.5 12s.67-1.5 1.5-1.5S14.5 11.67 14.5 12z"/>
-  </svg>
-);
 
 const SignInScreen = () => {
   const [email, setEmail] = useState('');
@@ -220,7 +213,7 @@ const SignInScreen = () => {
         }
 
         if (!role) {
-          const attendantsQuery = query(collection(db, 'attendants'), where('email', '==', email));
+          const attendantsQuery = query(collection(db, 'attendants'), where('email', '==', email), limit(1));
           const attendantsSnap = await getDocs(attendantsQuery);
           if (!attendantsSnap.empty) {
             role = 'attendant';
@@ -228,7 +221,7 @@ const SignInScreen = () => {
         }
 
         if (!role) {
-          const clientsQuery = query(collection(db, 'clients'), where('email', '==', email));
+          const clientsQuery = query(collection(db, 'clients'), where('email', '==', email), limit(1));
           const clientsSnap = await getDocs(clientsQuery);
           if (!clientsSnap.empty) {
             role = 'client';
@@ -378,13 +371,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     backgroundColor: colors.background,
-    paddingHorizontal: responsive.spacing.lg,
+    paddingHorizontal: 0,
     maxWidth: responsive.isDesktop ? 500 : '100%',
     alignSelf: 'center',
     width: '100%',
   },
   logoContainer: {
     alignItems: 'center',
+    paddingHorizontal: responsive.spacing.lg,
     marginTop: responsive.spacing.xl,
     marginBottom: responsive.spacing.lg,
   },
@@ -395,7 +389,7 @@ const styles = StyleSheet.create({
   formContainer: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: responsive.spacing.md,
+    paddingHorizontal: responsive.spacing.lg,
   },
   title: {
     fontSize: responsive.fontSize.lg,
@@ -454,7 +448,8 @@ const styles = StyleSheet.create({
     height: responsive.spacing.xl * 2,
   },
   footer: {
-    padding: responsive.spacing.lg,
+    paddingHorizontal: responsive.spacing.lg,
+    paddingVertical: responsive.spacing.lg,
     alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: colors.border,

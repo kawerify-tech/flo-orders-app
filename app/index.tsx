@@ -12,12 +12,21 @@ const WelcomeScreen = () => {
   const breakpoint = useBreakpoint();
   const [checkingTerms, setCheckingTerms] = useState(true);
 
+  const safeJsonParse = (raw: string | null) => {
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       try {
         // Check if the current legal agreement has been accepted
         const acceptanceRaw = await AsyncStorage.getItem(LEGAL.acceptanceStorageKey);
-        const acceptance = acceptanceRaw ? JSON.parse(acceptanceRaw) : null;
+        const acceptance = safeJsonParse(acceptanceRaw);
         if (!acceptance || acceptance.agreementId !== LEGAL.agreementId) {
           // Redirect to terms acceptance screen
           try {

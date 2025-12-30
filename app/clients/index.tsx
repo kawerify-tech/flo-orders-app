@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   collection,
   query,
@@ -18,17 +17,16 @@ import {
   orderBy,
   limit,
   getDoc,
-  DocumentData,
   onSnapshot,
-  serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../../lib/firebaseConfig';
-import { getAuth } from 'firebase/auth';
+import { auth, db } from '../../lib/firebaseConfig';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { commonStyles } from '../../constants/theme';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
+import { useRouter } from 'expo-router';
 
 interface ClientDashboardProps {
   navigation?: any;
@@ -37,7 +35,6 @@ interface ClientDashboardProps {
 interface Transaction {
   id: string;
   amount: number;
-  litres: number;
   fuelType: 'diesel' | 'blend';
   status: 'pending' | 'approved' | 'rejected' | 'completed';
   vehicle: string;
@@ -66,40 +63,43 @@ interface ClientData {
   totalRefills: number;
 }
 
-type RootStackParamList = {
-  Login: undefined;
-  Dashboard: undefined;
-  // Add other screens as needed
-};
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
 const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
-  const [pendingInvoices, setPendingInvoices] = useState<Transaction[]>([]);
+  const hasAlertedTransactionsPermission = useRef(false);
   const [pumpPrices, setPumpPrices] = useState<{ petrol: string; diesel: string }>({
     petrol: '0',
     diesel: '0'
   });
-  const auth = getAuth();
-  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let unsubscribeTransactions: (() => void) | undefined;
 
     const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
-      if (user?.email) {
+      if (user?.uid && user?.email) {
         console.log('Fetching data for:', user.email);
         // Store the unsubscribe function returned by fetchClientData
-        const cleanup = await fetchClientData(user.email);
+        const cleanup = await fetchClientData(user.uid, user.email);
         unsubscribeTransactions = cleanup;
       } else {
         console.log('No authenticated user');
+        if (unsubscribeTransactions) {
+          try {
+            unsubscribeTransactions();
+          } catch (e) {
+            console.warn('Error unsubscribing transactions listener:', e);
+          }
+          unsubscribeTransactions = undefined;
+        }
         setLoading(false);
         setClientData(null);
-        navigation?.navigate('Login');
+        if (navigation?.navigate) {
+          navigation.navigate('Login');
+        } else {
+          router.replace('/signin' as any);
+        }
       }
     });
 
@@ -110,7 +110,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
         unsubscribeTransactions();
       }
     };
-  }, []);
+  }, [navigation]);
 
   useEffect(() => {
     const fetchPumpPrices = async () => {
@@ -134,19 +134,34 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
     fetchPumpPrices();
   }, []);
 
-  const fetchClientData = async (email: string): Promise<() => void> => {
-    if (!email) {
+  const fetchClientData = async (uid: string, email: string): Promise<() => void> => {
+    if (!uid || !email) {
       setLoading(false);
       return () => {};
     }
 
     try {
-      // First fetch client data using query
-      const clientsRef = collection(db, 'clients');
-      const q = query(clientsRef, where('email', '==', email.toLowerCase()));
-      const querySnapshot = await getDocs(q);
+      const normalizedEmail = email.toLowerCase();
 
-      if (querySnapshot.empty) {
+      let clientDocId = uid;
+      let clientDocData: any | null = null;
+
+      const clientRef = doc(db, 'clients', uid);
+      const clientSnap = await getDoc(clientRef);
+      if (clientSnap.exists()) {
+        clientDocData = clientSnap.data();
+      } else {
+        const clientsRef = collection(db, 'clients');
+        const q = query(clientsRef, where('email', '==', normalizedEmail));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const found = querySnapshot.docs[0];
+          clientDocId = found.id;
+          clientDocData = found.data();
+        }
+      }
+
+      if (!clientDocData) {
         console.log('No client document found for:', email);
         Alert.alert(
           'Account Not Found',
@@ -158,15 +173,11 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
         return () => {};
       }
 
-      // Get the first matching document
-      const clientDoc = querySnapshot.docs[0];
-      const clientDocData = clientDoc.data();
-
       // Set client data with type safety
       setClientData({
-        id: clientDoc.id,
+        id: clientDocId,
         name: clientDocData?.name || '',
-        email: clientDocData?.email?.toLowerCase() || email.toLowerCase(),
+        email: clientDocData?.email?.toLowerCase() || normalizedEmail,
         balance: Number(clientDocData?.balance || 0),
         pumpPrice: clientDocData?.pumpPrice || '0',
         vatNumber: clientDocData?.vatNumber || '',
@@ -206,7 +217,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
             return {
           id: doc.id,
               amount: Number(data.amount || 0),
-              litres: Number(data.litres || 0),
               fuelType: data.fuelType as 'diesel' | 'blend',
               status: data.status as 'pending' | 'approved' | 'rejected' | 'completed',
               vehicle: data.vehicle || '',
@@ -226,24 +236,24 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
             .filter(t => t.status === 'completed')
             .slice(0, 5); // Show fewer recent transactions
 
-          const pendingTransactions = allTransactions
-            .filter(t => t.status === 'pending');
-
           setRecentTransactions(completedTransactions);
-          setPendingInvoices(pendingTransactions);
           
           console.log(`Fetched ${allTransactions.length} recent transactions`);
         },
         (error) => {
           console.error('Error subscribing to transactions:', error);
           if (error.code === 'permission-denied') {
-            Alert.alert('Error', 'You do not have permission to view these transactions');
+            if (!hasAlertedTransactionsPermission.current) {
+              hasAlertedTransactionsPermission.current = true;
+              Alert.alert('Permission', 'Transactions cannot be loaded due to missing permissions. Please contact the admin to update Firebase rules.');
+            }
+            setRecentTransactions([]);
           } else if (error.code === 'resource-exhausted') {
             Alert.alert('Error', 'Too many requests. Please try again later');
-      } else {
+          } else {
             Alert.alert('Error', 'Failed to load transactions');
           }
-      }
+        }
       );
 
       setLoading(false);
@@ -260,8 +270,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
   const handleRefresh = async () => {
     setLoading(true);
     const user = auth.currentUser;
-    if (user?.email) {
-      await fetchClientData(user.email);
+    if (user?.uid && user?.email) {
+      await fetchClientData(user.uid, user.email);
     } else {
       setLoading(false);
       Alert.alert('Error', 'Please login again');
@@ -285,17 +295,17 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+      <SafeAreaLayout>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6A0DAD" />
         </View>
-      </SafeAreaView>
+      </SafeAreaLayout>
     );
   }
 
   if (!clientData) {
     return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+      <SafeAreaLayout>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>No client profile found</Text>
           <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
@@ -303,13 +313,16 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
             <Text style={styles.refreshText}>Refresh</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </SafeAreaLayout>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
+    <SafeAreaLayout>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Header Section */}
         <LinearGradient
           colors={['#8A2BE2', '#6A0DAD']}
@@ -421,12 +434,12 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ navigation }) => {
         </View>
       </View>
 
-      <View style={styles.pricesContainer}>
-        <Text style={styles.priceText}>Diesel: ${pumpPrices.diesel}/L</Text>
-        <Text style={styles.priceText}>Petrol: ${pumpPrices.petrol}/L</Text>
-      </View>
+        <View style={styles.pricesContainer}>
+          <Text style={styles.priceText}>Diesel: ${pumpPrices.diesel}/L</Text>
+          <Text style={styles.priceText}>Petrol: ${pumpPrices.petrol}/L</Text>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaLayout>
   );
 };
 
@@ -435,13 +448,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
+  scrollContent: {
+    paddingBottom: 32,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   header: {
-    paddingTop: 40,
+    paddingTop: 24,
     paddingBottom: 30,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
@@ -476,16 +492,11 @@ const styles = StyleSheet.create({
     marginTop: -30,
   },
   statCard: {
-    backgroundColor: '#FFFFFF',
+    ...commonStyles.glassCard,
     padding: 16,
     borderRadius: 12,
     width: '30%',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   statTitle: {
     fontSize: 12,
@@ -509,15 +520,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   detailsCard: {
-    backgroundColor: '#FFFFFF',
+    ...commonStyles.glassCard,
     margin: 16,
     padding: 20,
     borderRadius: 20,
-    shadowColor: '#6A0DAD',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
   },
   detailsTitle: {
     fontSize: 20,
@@ -563,15 +569,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   transactionCard: {
-    backgroundColor: '#FFFFFF',
+    ...commonStyles.glassCard,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   transactionHeader: {
     flexDirection: 'row',
@@ -614,14 +615,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   summaryCard: {
-    backgroundColor: '#FFFFFF',
+    ...commonStyles.glassCard,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -644,14 +640,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   vehiclesContainer: {
-    backgroundColor: '#FFFFFF',
+    ...commonStyles.glassCard,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   vehicleCard: {
     flexDirection: 'row',
@@ -668,10 +659,17 @@ const styles = StyleSheet.create({
   pricesContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginHorizontal: 16,
     marginTop: 8,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
   },
   priceText: {
-    color: '#FFFFFF',
+    color: '#333333',
     fontSize: 14,
     fontWeight: '500',
   },

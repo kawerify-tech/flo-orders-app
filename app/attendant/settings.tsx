@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Switch, Modal, Alert, ScrollView, ActivityIndicator, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAuth, updatePassword, signOut, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebaseConfig';
+import { updatePassword, signOut, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { collection, doc, getDoc, getDocs, limit, query, setDoc, where } from 'firebase/firestore';
+import { auth, db } from '../../lib/firebaseConfig';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaLayout } from '../../components/SafeAreaLayout';
+import { commonStyles } from '../../constants/theme';
 
 // Available languages
 const LANGUAGES = [
@@ -29,9 +30,9 @@ const Settings: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [userData, setUserData] = useState<any>(null);
   const [userRole, setUserRole] = useState<'admin' | 'attendant' | 'client' | null>(null);
+  const [attendantDocId, setAttendantDocId] = useState<string | null>(null);
 
   const router = useRouter();
-  const auth = getAuth();
 
   // Load saved settings
   useEffect(() => {
@@ -65,31 +66,44 @@ const Settings: React.FC = () => {
           console.log('Current user email:', userEmail);
         }
         setUserEmail(userEmail || '');
-        
-        // Check if user is attendant by checking the attendants collection
-        const attendantsRef = collection(db, 'attendants');
-        const q = query(attendantsRef, where('email', '==', userEmail));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          if (__DEV__) {
-            console.log('User is attendant');
+
+        let resolvedDocId: string | null = null;
+        let attendantSnap = await getDoc(doc(db, 'attendants', user.uid));
+
+        if (attendantSnap.exists()) {
+          resolvedDocId = user.uid;
+        } else if (userEmail) {
+          const attendantsQuery = query(
+            collection(db, 'attendants'),
+            where('email', '==', userEmail.toLowerCase()),
+            limit(1)
+          );
+          const attendantsSnap = await getDocs(attendantsQuery);
+          if (!attendantsSnap.empty) {
+            resolvedDocId = attendantsSnap.docs[0].id;
+            attendantSnap = attendantsSnap.docs[0];
           }
-          setUserRole('attendant');
-          const attendantData = querySnapshot.docs[0].data();
-          setUserData(attendantData);
-          // Load attendant settings if they exist
-          if (attendantData.language) setLanguage(attendantData.language);
-          if (attendantData.notifications !== undefined) setNotifications(attendantData.notifications);
-        } else {
+        }
+
+        if (!resolvedDocId || !attendantSnap.exists()) {
           if (__DEV__) {
             console.log('User is not attendant');
           }
-          // If not attendant, redirect to signin
           Alert.alert('Error', 'Unauthorized access');
           await signOut(auth);
           router.replace('/signin');
+          return;
         }
+
+        if (__DEV__) {
+          console.log('User is attendant');
+        }
+        setUserRole('attendant');
+        setAttendantDocId(resolvedDocId);
+        const attendantData = attendantSnap.data();
+        setUserData(attendantData);
+        if (attendantData.language) setLanguage(attendantData.language);
+        if (attendantData.notifications !== undefined) setNotifications(attendantData.notifications);
       } catch (error) {
         console.error('Error fetching user data:', error);
         Alert.alert('Error', 'Failed to load user data');
@@ -111,18 +125,13 @@ const Settings: React.FC = () => {
 
         // Only save if user is attendant
         if (userRole === 'attendant') {
-          const attendantsRef = collection(db, 'attendants');
-          const q = query(attendantsRef, where('email', '==', currentUser.email));
-          const querySnapshot = await getDocs(q);
-          
-          if (!querySnapshot.empty) {
-            const attendantDoc = querySnapshot.docs[0];
-            await setDoc(attendantDoc.ref, {
-              language,
-              notifications,
-              updatedAt: new Date(),
-            }, { merge: true });
-          }
+          const targetDocId = attendantDocId || currentUser.uid;
+          const attendantRef = doc(db, 'attendants', targetDocId);
+          await setDoc(attendantRef, {
+            language,
+            notifications,
+            updatedAt: new Date(),
+          }, { merge: true });
         }
       } catch (error) {
         console.error('Error saving settings:', error);
@@ -131,7 +140,7 @@ const Settings: React.FC = () => {
     };
     
     saveSettings();
-  }, [language, notifications, userRole]);
+  }, [language, notifications, userRole, attendantDocId]);
 
   // Handle password change
   const handleChangePassword = async () => {
@@ -216,7 +225,11 @@ const Settings: React.FC = () => {
 
   return (
     <SafeAreaLayout>
-      <ScrollView style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         {loading && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#6A0DAD" />
@@ -391,7 +404,12 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: '#F9F9F9', 
-    padding: 20 
+    padding: 0 
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -411,15 +429,10 @@ const styles = StyleSheet.create({
     marginBottom: 20 
   },
   sectionCard: {
-    backgroundColor: '#fff',
+    ...commonStyles.glassCard,
     borderRadius: 10,
     padding: 20,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 5,
-    elevation: 4,
   },
   sectionTitle: { 
     fontSize: 20, 

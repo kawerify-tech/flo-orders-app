@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Switch, Modal, Alert, ScrollView, ActivityIndicator, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAuth, updatePassword, signOut, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { updatePassword, signOut, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebaseConfig';
+import { auth, db } from '../../lib/firebaseConfig';
 import { Picker } from '@react-native-picker/picker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { SafeAreaLayout } from '../../components/SafeAreaLayout';
+import { commonStyles } from '../../constants/theme';
 
 // Available languages
 const LANGUAGES = [
@@ -31,7 +32,6 @@ const Settings: React.FC = () => {
   const [userRole, setUserRole] = useState<'admin' | 'client' | null>(null);
 
   const router = useRouter();
-  const auth = getAuth();
 
   // Load saved settings
   useEffect(() => {
@@ -211,7 +211,11 @@ const Settings: React.FC = () => {
 
   return (
     <SafeAreaLayout>
-      <ScrollView style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         {loading && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#6A0DAD" />
@@ -386,7 +390,12 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: '#F9F9F9', 
-    padding: 20 
+    padding: 0 
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -406,15 +415,10 @@ const styles = StyleSheet.create({
     marginBottom: 20 
   },
   sectionCard: {
-    backgroundColor: '#fff',
+    ...commonStyles.glassCard,
     borderRadius: 10,
     padding: 20,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 5,
-    elevation: 4,
   },
   sectionTitle: { 
     fontSize: 20, 

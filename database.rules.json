@@ -43,7 +43,7 @@
         ".read": "auth != null",
         ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin')",
         "role": {
-          ".validate": "newData.val() === 'admin' || newData.val() === 'attendant'"
+          ".validate": "newData.val() === 'admin' || newData.val() === 'attendant' || newData.val() === 'client'"
         },
         "name": {
           ".validate": "newData.isString() && newData.val().length > 0"

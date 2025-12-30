@@ -3,6 +3,7 @@ module.exports = {
     name: "Flo Orders",
     slug: "flo-orders",
     version: "1.0.0",
+    scheme: "floorders",
     platforms: ["ios", "android"],
     orientation: "default",
     icon: "./assets/images/favicon.png",

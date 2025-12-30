@@ -2,15 +2,25 @@ import React from 'react';
 import { Tabs } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
 import { Text, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
-      screenOptions={{
+      screenOptions={({
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 64 + insets.bottom,
+            paddingBottom: Math.max(insets.bottom, 6),
+          },
+        ],
         tabBarShowLabel: false,
-      }}
+        sceneContainerStyle: styles.scene,
+      } as any)}
     >
       <Tabs.Screen
         name="index"
@@ -81,12 +91,13 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  scene: {
+    backgroundColor: '#F5F5F5',
+  },
   tabBar: {
     backgroundColor: "white",
     borderTopWidth: 0.5,
     borderTopColor: "#ddd",
-    height: 80,
-    paddingBottom: 6,
     paddingTop: 6,
     elevation: 8, // Android shadow
     shadowColor: '#000', // iOS shadow

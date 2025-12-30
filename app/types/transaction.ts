@@ -16,4 +16,8 @@ export interface Transaction {
   clientEmail: string;
   clientId: string;
   notes?: string;
-} 
+}
+
+export default function TransactionTypeRoute() {
+  return null;
+}

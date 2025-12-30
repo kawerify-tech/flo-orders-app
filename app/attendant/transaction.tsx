@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, ScrollView } from 'react-native';
-import { collection, query, where, orderBy, getDocs, updateDoc, doc, Timestamp, getDoc, setDoc, increment } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, updateDoc, doc, Timestamp, getDoc, increment } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
+import { handleAppError, showUserError, showUserSuccess } from '../../utils/userFacingError';
 
 interface Transaction {
   id: string;
@@ -271,7 +273,7 @@ const TransactionScreen: React.FC = () => {
       // Check if user is authenticated
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert('Error', 'You must be signed in to approve transactions');
+        showUserError('Please sign in again.');
         return;
       }
 
@@ -300,49 +302,58 @@ const TransactionScreen: React.FC = () => {
       });
 
       // Update client's transaction copy
-      const clientTransactionRef = doc(
-        db, 
-        `clients/${transaction.clientEmail}/transactions/${transaction.id}`
-      );
       try {
-        await updateDoc(clientTransactionRef, {
-          status: 'completed',
-          updatedAt: now,
-          attendantId,
-          attendantName,
-          processedAt: now,
-          processingSteps: [
-            ...(transaction.processingSteps || []),
-            {
-              step: 'approved',
-              timestamp: now,
-              status: 'completed',
-              attendantId,
-              attendantName
-            }
-          ]
-        });
+        const clientDocId = transaction.clientId;
+        if (clientDocId) {
+          const clientTransactionRef = doc(db, `clients/${clientDocId}/transactions/${transaction.id}`);
+          await updateDoc(clientTransactionRef, {
+            status: 'completed',
+            updatedAt: now,
+            attendantId,
+            attendantName,
+            processedAt: now,
+            processingSteps: [
+              ...(transaction.processingSteps || []),
+              {
+                step: 'approved',
+                timestamp: now,
+                status: 'completed',
+                attendantId,
+                attendantName,
+              },
+            ],
+          });
+        }
       } catch (error) {
-        console.error('Error updating client transaction copy:', error);
+        if (__DEV__) {
+          console.warn('Error updating client transaction copy:', error);
+        }
       }
 
       // Best-effort: update client's balance (do not block approval UI)
       try {
-        const clientRef = doc(db, 'clients', transaction.clientEmail);
-        await updateDoc(clientRef, {
-          balance: increment(-transaction.amount)
-        });
+        const clientDocId = transaction.clientId;
+        if (clientDocId) {
+          const clientRef = doc(db, 'clients', clientDocId);
+          await updateDoc(clientRef, {
+            balance: increment(-transaction.amount),
+          });
+        }
       } catch (error) {
-        console.error('Error updating client balance:', error);
+        if (__DEV__) {
+          console.warn('Error updating client balance:', error);
+        }
       }
 
       // Best-effort: refresh UI
       await refreshTransactions();
 
-      Alert.alert('Success', 'Transaction approved successfully');
+      showUserSuccess('Transaction approved successfully');
     } catch (error) {
-      console.error('Error approving transaction:', error);
-      Alert.alert('Error', 'Failed to approve transaction. Please check your permissions.');
+      handleAppError(error, {
+        context: 'Error approving transaction:',
+        userMessage: 'Could not approve the transaction right now. Please try again.',
+      });
     }
   };
 
@@ -351,7 +362,7 @@ const TransactionScreen: React.FC = () => {
       // Check if user is authenticated
       const currentUser = auth.currentUser;
       if (!currentUser) {
-        Alert.alert('Error', 'You must be signed in to reject transactions');
+        showUserError('Please sign in again.');
         return;
       }
 
@@ -380,125 +391,48 @@ const TransactionScreen: React.FC = () => {
       });
 
       // Update client's transaction copy
-      const clientTransactionRef = doc(
-        db, 
-        `clients/${transaction.clientEmail}/transactions/${transaction.id}`
-      );
       try {
-        await updateDoc(clientTransactionRef, {
-          status: 'rejected',
-          updatedAt: now,
-          attendantId,
-          attendantName,
-          processedAt: now,
-          processingSteps: [
-            ...(transaction.processingSteps || []),
-            {
-              step: 'rejected',
-              timestamp: now,
-              status: 'rejected',
-              attendantId,
-              attendantName
-            }
-          ]
-        });
+        const clientDocId = transaction.clientId;
+        if (clientDocId) {
+          const clientTransactionRef = doc(db, `clients/${clientDocId}/transactions/${transaction.id}`);
+          await updateDoc(clientTransactionRef, {
+            status: 'rejected',
+            updatedAt: now,
+            attendantId,
+            attendantName,
+            processedAt: now,
+            processingSteps: [
+              ...(transaction.processingSteps || []),
+              {
+                step: 'rejected',
+                timestamp: now,
+                status: 'rejected',
+                attendantId,
+                attendantName,
+              },
+            ],
+          });
+        }
       } catch (error) {
-        console.error('Error updating client transaction copy:', error);
+        if (__DEV__) {
+          console.warn('Error updating client transaction copy:', error);
+        }
       }
 
       // Best-effort: refresh UI
       await refreshTransactions();
 
-      Alert.alert('Success', 'Transaction rejected successfully');
+      showUserSuccess('Transaction rejected successfully');
     } catch (error) {
-      console.error('Error rejecting transaction:', error);
-      Alert.alert('Error', 'Failed to reject transaction. Please check your permissions.');
+      handleAppError(error, {
+        context: 'Error rejecting transaction:',
+        userMessage: 'Could not reject the transaction right now. Please try again.',
+      });
     }
   };
 
   const handleCreateTransaction = async () => {
-    try {
-      // Check if user is authenticated
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        Alert.alert('Error', 'You must be signed in to create transactions');
-        return;
-      }
-
-      if (!createForm.selectedClient || !createForm.vehicle || !createForm.amount) {
-        Alert.alert('Error', 'Please fill in all required fields');
-        return;
-      }
-
-      const amount = Number(createForm.amount);
-      if (isNaN(amount) || amount <= 0) {
-        Alert.alert('Error', 'Please enter a valid amount');
-        return;
-      }
-
-      if (amount > createForm.selectedClient.balance) {
-        Alert.alert('Error', 'Amount exceeds available balance');
-        return;
-      }
-
-      setLoadingCreate(true);
-
-      const now = Timestamp.now();
-      const transactionData = {
-        clientId: createForm.selectedClient.id,
-        clientName: createForm.selectedClient.name,
-        clientEmail: createForm.selectedClient.email,
-        amount,
-        litres: Number(createForm.litres),
-        status: 'pending' as const,
-        vehicle: createForm.vehicle,
-        fuelType: createForm.fuelType,
-        timestamp: now,
-        pumpPrice: createForm.fuelType === 'diesel' ? pumpPrices.diesel : pumpPrices.petrol,
-        metadata: {
-          clientBalance: createForm.selectedClient.balance,
-          remainingFuel: 0
-        }
-      };
-
-      // Create transaction in main collection
-      const transactionRef = doc(collection(db, 'transactions'));
-      await setDoc(transactionRef, transactionData);
-
-      // Create transaction in client's collection
-      try {
-        const clientTransactionRef = doc(
-          db,
-          `clients/${createForm.selectedClient.email}/transactions/${transactionRef.id}`
-        );
-        await setDoc(clientTransactionRef, transactionData);
-      } catch (error) {
-        console.error('Error creating client transaction copy:', error);
-      }
-
-      // Reset form and close modals
-      setCreateForm({
-        clientEmail: '',
-        clientName: '',
-        vehicle: '',
-        fuelType: 'diesel',
-        litres: '',
-        amount: '',
-        selectedClient: null
-      });
-      setShowClientList(false);
-      setModalVisible(false);
-
-      // Best-effort: refresh UI (do not show permission error if this fails)
-      await refreshTransactions();
-
-      Alert.alert('Success', 'Transaction created successfully');
-    } catch (error) {
-      console.error('Error creating transaction:', error);
-      Alert.alert('Error', 'Failed to create transaction. Please check your permissions.');
-    } finally {
-      setLoadingCreate(false);
-    }
+    Alert.alert('Not allowed', 'Clients create transactions. Attendants can only approve or reject.');
   };
 
   const renderTransactionItem = ({ item }: { item: Transaction }) => (
@@ -567,89 +501,82 @@ const TransactionScreen: React.FC = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Transactions</Text>
-        <View style={styles.pumpPrices}>
-          <Text style={styles.pumpPriceText}>Diesel: $ {pumpPrices.diesel}</Text>
-          <Text style={styles.pumpPriceText}>Petrol: $ {pumpPrices.petrol}</Text>
+    <SafeAreaLayout>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Transactions</Text>
+          <View style={styles.pumpPrices}>
+            <Text style={styles.pumpPriceText}>Diesel: $ {pumpPrices.diesel}</Text>
+            <Text style={styles.pumpPriceText}>Petrol: $ {pumpPrices.petrol}</Text>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search transactions..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity 
-            style={styles.clearButton}
-            onPress={() => setSearchQuery('')}
-          >
-            <Ionicons name="close-circle" size={20} color="#666" />
-          </TouchableOpacity>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search transactions..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity 
+              style={styles.clearButton}
+              onPress={() => setSearchQuery('')}
+            >
+              <Ionicons name="close-circle" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#6A0DAD" />
+          </View>
+        ) : (
+          <FlatList
+            style={styles.transactionsList}
+            data={searchQuery ? filteredTransactions : []}
+            renderItem={renderTransactionItem}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={
+              searchQuery ? (
+                null
+              ) : (
+                <>
+                  {renderSection('Pending', transactionsByStatus.pending, transactionsByStatus.pending.length)}
+                  {renderSection('Completed', transactionsByStatus.completed, transactionsByStatus.completed.length)}
+                  {renderSection('Rejected', transactionsByStatus.rejected, transactionsByStatus.rejected.length)}
+                </>
+              )
+            }
+            ListEmptyComponent={
+              searchQuery ? (
+                <Text style={styles.emptyText}>No transactions found</Text>
+              ) : null
+            }
+          />
         )}
-      </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6A0DAD" />
-        </View>
-      ) : (
-        <FlatList
-          style={styles.transactionsList}
-          data={searchQuery ? filteredTransactions : []}
-          renderItem={renderTransactionItem}
-          keyExtractor={(item) => item.id}
-          ListHeaderComponent={
-            searchQuery ? (
-              null
-            ) : (
-              <>
-                {renderSection('Pending', transactionsByStatus.pending, transactionsByStatus.pending.length)}
-                {renderSection('Completed', transactionsByStatus.completed, transactionsByStatus.completed.length)}
-                {renderSection('Rejected', transactionsByStatus.rejected, transactionsByStatus.rejected.length)}
-              </>
-            )
-          }
-          ListEmptyComponent={
-            searchQuery ? (
-              <Text style={styles.emptyText}>No transactions found</Text>
-            ) : null
-          }
-        />
-      )}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={false}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Create New Transaction</Text>
+                <TouchableOpacity 
+                  style={styles.closeButton}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
 
-      <TouchableOpacity 
-        style={styles.createButton}
-        onPress={() => setModalVisible(true)}
-      >
-        <Ionicons name="add-circle" size={24} color="#FFF" />
-        <Text style={styles.createButtonText}>Create Transaction</Text>
-      </TouchableOpacity>
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Create New Transaction</Text>
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={() => setModalVisible(false)}
-              >
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.formContainer}>
+              <ScrollView style={styles.formContainer}>
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Client</Text>
                 <TouchableOpacity 
@@ -827,11 +754,12 @@ const TransactionScreen: React.FC = () => {
                   <Text style={styles.submitButtonText}>Create Transaction</Text>
                 )}
               </TouchableOpacity>
-            </ScrollView>
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </SafeAreaLayout>
   );
 };
 

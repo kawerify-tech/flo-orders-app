@@ -4,7 +4,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { db } from './firebaseConfig';
-import { collection, getDoc, getDocs, query, where, doc as firestoreDoc } from 'firebase/firestore';
+import { collection, getDoc, getDocs, limit, query, where, doc as firestoreDoc } from 'firebase/firestore';
 
 // Define the context type
 type AuthContextType = {
@@ -46,13 +46,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return 'admin';
       }
 
-      const attendantsQuery = query(collection(db, 'attendants'), where('email', '==', normalizedEmail));
+      const attendantsQuery = query(collection(db, 'attendants'), where('email', '==', normalizedEmail), limit(1));
       const attendantsSnap = await getDocs(attendantsQuery);
       if (!attendantsSnap.empty) {
         return 'attendant';
       }
 
-      const clientsQuery = query(collection(db, 'clients'), where('email', '==', normalizedEmail));
+      const clientsQuery = query(collection(db, 'clients'), where('email', '==', normalizedEmail), limit(1));
       const clientsSnap = await getDocs(clientsQuery);
       if (!clientsSnap.empty) {
         return 'client';

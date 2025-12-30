@@ -7,6 +7,7 @@ import { useThemeColors, responsive } from '../constants/theme';
 interface SafeAreaLayoutProps {
   children: React.ReactNode;
   style?: any;
+  contentStyle?: any;
   edges?: ('top' | 'bottom' | 'left' | 'right')[];
   statusBarStyle?: 'auto' | 'light' | 'dark';
 }
@@ -14,6 +15,7 @@ interface SafeAreaLayoutProps {
 export const SafeAreaLayout: React.FC<SafeAreaLayoutProps> = ({
   children,
   style,
+  contentStyle,
   edges = ['top', 'bottom', 'left', 'right'],
   statusBarStyle = 'auto'
 }) => {
@@ -33,10 +35,10 @@ export const SafeAreaLayout: React.FC<SafeAreaLayoutProps> = ({
     >
       <StatusBar
         style={getStatusBarStyle()}
-        backgroundColor="transparent"
-        translucent={true}
+        backgroundColor={colors.background}
+        translucent={false}
       />
-      <View style={[styles.content, { backgroundColor: colors.background }]}>
+      <View style={[styles.content, { backgroundColor: colors.background }, contentStyle]}>
         {children}
       </View>
     </SafeAreaView>
@@ -49,7 +51,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: responsive.spacing.md,
-    paddingBottom: responsive.spacing.sm,
+    width: '100%',
+    paddingHorizontal: 0,
+    paddingBottom: 0,
   },
 });

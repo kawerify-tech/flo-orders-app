@@ -1,16 +1,26 @@
 import React from 'react';
-import { Tabs, Stack } from "expo-router";
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Tabs } from "expo-router";
+import { Ionicons } from '@expo/vector-icons';
 import { Text, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
-      screenOptions={{
+      screenOptions={({
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 64 + insets.bottom,
+            paddingBottom: Math.max(insets.bottom, 6),
+          },
+        ],
         tabBarShowLabel: false,
-      }}
+        sceneContainerStyle: styles.scene,
+      } as any)}
     >
       {/** Home Tab */}
       <Tabs.Screen
@@ -89,27 +99,18 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="clients/index"
-        options={{
-          title: 'Clients',
-          href: null,
-          tabBarIcon: ({ color, size }) => (
-            <FontAwesome name="users" size={size} color={color} />
-          ),
-        }}
-      />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
+  scene: {
+    backgroundColor: '#F5F5F5',
+  },
   tabBar: {
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    height: 80,
-    paddingBottom: 6,
     paddingTop: 6,
   },
   iconContainer: {

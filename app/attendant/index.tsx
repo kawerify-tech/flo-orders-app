@@ -3,6 +3,8 @@ import { View, Text, FlatList, StyleSheet, ScrollView, ActivityIndicator } from 
 import { collection, query, orderBy, onSnapshot, where, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
+import { commonStyles } from '../../constants/theme';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
 
 // Types
 interface Stats {
@@ -152,25 +154,27 @@ const AttendantDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6A0DAD" />
-      </View>
+      <SafeAreaLayout>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6A0DAD" />
+        </View>
+      </SafeAreaLayout>
     );
   }
 
   return (
-    <View style={styles.mainContainer}>
-      <View style={styles.fixedHeader}>
-        <View style={styles.headerContent}>
-          <Ionicons name="person-circle" size={32} color="#FFFFFF" />
-          <Text style={styles.headerTitle}>Attendant Dashboard</Text>
-        </View>
-      </View>
-
-      <ScrollView 
+    <SafeAreaLayout>
+      <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
       >
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <Ionicons name="person-circle" size={32} color="#FFFFFF" />
+            <Text style={styles.headerTitle}>Attendant Dashboard</Text>
+          </View>
+        </View>
+
         <View style={styles.statsContainer}>
           <StatCard 
             title="Total Clients" 
@@ -225,16 +229,12 @@ const AttendantDashboard: React.FC = () => {
           />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  mainContainer: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  fixedHeader: {
+  header: {
     backgroundColor: '#6A0DAD',
     padding: 20,
     elevation: 4,
@@ -242,18 +242,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
   },
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
   scrollContent: {
-    paddingTop: 80, // Add padding to account for fixed header
+    flexGrow: 1,
+    paddingBottom: 32,
   },
   loadingContainer: {
     flex: 1,
@@ -270,26 +266,16 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     padding: 16,
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    ...commonStyles.glassCard,
     margin: 16,
     borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   section: {
     marginHorizontal: 16,
     marginBottom: 20,
-    backgroundColor: '#fff',
+    ...commonStyles.glassCard,
     borderRadius: 12,
     padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   sectionTitle: {
     fontSize: 18,
@@ -300,17 +286,12 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   listItem: {
-    backgroundColor: '#FFFFFF',
+    ...commonStyles.glassCard,
     borderRadius: 12,
     padding: 16,
     marginRight: 12,
     marginBottom: 8,
     width: 280,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     borderLeftWidth: 4,
   },
   listItemHeader: {
@@ -346,15 +327,10 @@ const styles = StyleSheet.create({
   },
   pricesContainer: {
     padding: 16,
-    backgroundColor: '#fff',
+    ...commonStyles.glassCard,
     marginHorizontal: 16,
     marginBottom: 20,
     borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   priceCardsContainer: {
     flexDirection: 'row',
@@ -363,22 +339,17 @@ const styles = StyleSheet.create({
   },
   priceCard: {
     width: '48%',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: 'rgba(248, 249, 250, 0.75)',
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   statCard: {
-    backgroundColor: '#FFFFFF',
+    ...commonStyles.glassCard,
     borderRadius: 12,
     padding: 16,
     width: '30%',
     marginBottom: 16,
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   statValue: {
     fontSize: 24,

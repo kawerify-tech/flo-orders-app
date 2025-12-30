@@ -13,8 +13,10 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useBreakpoint } from '../constants/breakpoints';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { LEGAL } from '../lib/legal';
+import { SafeAreaLayout } from '../components/SafeAreaLayout';
+import { Ionicons } from '@expo/vector-icons';
 
 const TermsAcceptanceScreen = () => {
   const [accepted, setAccepted] = useState(false);
@@ -80,9 +82,14 @@ const TermsAcceptanceScreen = () => {
     try {
       // Request notification permissions
       try {
-        const { status: notificationStatus } = await Notifications.requestPermissionsAsync();
-        if (notificationStatus !== 'granted') {
-          console.warn('Notification permission not granted');
+        // expo-notifications remote push is not supported in Expo Go (SDK 53+).
+        // Avoid importing the module in Expo Go to prevent warnings / instability.
+        if (Constants.appOwnership !== 'expo') {
+          const Notifications = await import('expo-notifications');
+          const { status: notificationStatus } = await Notifications.requestPermissionsAsync();
+          if (notificationStatus !== 'granted') {
+            console.warn('Notification permission not granted');
+          }
         }
       } catch (notifError) {
         console.warn('Error requesting notification permission:', notifError);
@@ -180,18 +187,36 @@ const TermsAcceptanceScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
-      >
-        <View style={styles.header}>
-          <Text style={[styles.title, { fontSize: headingFontSize }]}>Terms of Service</Text>
-          <Text style={[styles.subtitle, { fontSize: textFontSize }]}>
-            Please read and accept to continue
-          </Text>
+    <SafeAreaLayout>
+      <View style={styles.container}>
+        <View style={styles.headerBar}>
+          <TouchableOpacity
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/' as any);
+              }
+            }}
+            style={styles.backButton}
+          >
+            <Ionicons name="chevron-back" size={24} color="#111" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>Terms</Text>
+          <View style={styles.headerRight} />
         </View>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={true}
+        >
+          <View style={styles.header}>
+            <Text style={[styles.title, { fontSize: headingFontSize }]}>Terms of Service</Text>
+            <Text style={[styles.subtitle, { fontSize: textFontSize }]}>
+              Please read and accept to continue
+            </Text>
+          </View>
 
         <View style={styles.content}>
           <Text style={[styles.sectionTitle, { fontSize: textFontSize + 2 }]}>Legal Documents</Text>
@@ -214,7 +239,7 @@ const TermsAcceptanceScreen = () => {
             1. Acceptance of Terms
           </Text>
           <Text style={[styles.text, { fontSize: textFontSize }]}>
-            By accessing and using the Flo Orders mobile application ("App"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+            By accessing and using the Flo Orders mobile application (&quot;App&quot;), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
           </Text>
 
           <Text style={[styles.sectionTitle, { fontSize: textFontSize + 2 }]}>
@@ -345,7 +370,7 @@ const TermsAcceptanceScreen = () => {
             10. Acceptance
           </Text>
           <Text style={[styles.text, { fontSize: textFontSize }]}>
-            By checking the box below and tapping "Accept & Continue", you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+            By checking the box below and tapping &quot;Accept &amp; Continue&quot;, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
           </Text>
 
           <View style={styles.checkboxContainer}>
@@ -381,13 +406,41 @@ const TermsAcceptanceScreen = () => {
         </TouchableOpacity>
       </View>
     </View>
-  );
+  </SafeAreaLayout>
+);
+
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#FFFFFF',
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+    textAlign: 'center',
+  },
+  headerRight: {
+    width: 44,
+    height: 44,
   },
   scrollView: {
     flex: 1,

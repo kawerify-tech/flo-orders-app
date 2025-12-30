@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,37 +8,30 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  Platform,
   Dimensions,
-  FlatList,
 } from 'react-native';
 import {
   collection,
-  addDoc,
   query,
   where,
   getDocs,
+  getDoc,
   orderBy,
   serverTimestamp,
   onSnapshot,
   doc,
-  updateDoc,
-  increment,
-  arrayUnion,
   setDoc,
   writeBatch,
   limit,
   deleteDoc,
   Timestamp,
 } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { db } from '../../lib/firebaseConfig';
+import { auth, db } from '../../lib/firebaseConfig';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { format } from 'date-fns';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
+import { handleAppError, showUserError, showUserSuccess } from '../../utils/userFacingError';
 
 interface ClientData {
   id: string;
@@ -97,41 +90,12 @@ interface Transaction {
     remainingFuel: number;
     requestSource: string;
   };
-  processingSteps: Array<{
+  processingSteps: {
     step: string;
     timestamp: string;
     status: string;
-  }>;
+  }[];
   notes?: string;
-}
-
-interface Notification {
-  id: string;
-  type: 'transaction' | 'message' | 'creation' | 'update';
-  title: string;
-  message: string;
-  fromUserId: string;
-  fromUserName: string;
-  fromUserRole: string;
-  toUserId: string;
-  toUserRole: string;
-  status: 'unread' | 'read';
-  createdAt: any;
-  relatedDocId?: string;
-  relatedCollection?: string;
-}
-
-interface Message {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderRole: string;
-  receiverId: string;
-  receiverName: string;
-  content: string;
-  timestamp: any;
-  status: 'sent' | 'delivered' | 'read';
-  attachments?: string[];
 }
 
 interface SavedTransaction extends Transaction {
@@ -153,66 +117,22 @@ const TransactionScreen = () => {
   const [isAmountValid, setIsAmountValid] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState<string>('');
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
-  const [isLoadingAttendants, setIsLoadingAttendants] = useState(true);
+  const hasAlertedTransactionsPermission = useRef(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [savedTransactions, setSavedTransactions] = useState<SavedTransaction[]>([]);
   const [draftTransactions, setDraftTransactions] = useState<SavedTransaction[]>([]);
   const [selectedFuelType, setSelectedFuelType] = useState<'diesel' | 'blend'>('diesel');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const unsubscribeTransactionsRef = useRef<null | (() => void)>(null);
 
   // Add new state for displaying current balance in transaction form
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [displayBalance, setDisplayBalance] = useState<number>(0);
-
-  const auth = getAuth();
   const currentUser = auth.currentUser;
-
-  useEffect(() => {
-    if (!currentUser) {
-      Alert.alert('Error', 'Please sign in to access transactions');
-      return;
-    }
-
-    const loadInitialData = async () => {
-      setLoading(true);
-      try {
-        const clientDataResult = await fetchClientData();
-        
-        if (clientDataResult) {
-          // Calculate remaining fuel based on balance and pump price
-          const remainingFuel = clientDataResult.balance / clientDataResult.pumpPrice;
-          
-          // Update the states
-          setCurrentBalance(clientDataResult.balance);
-          setDisplayBalance(clientDataResult.balance);
-          
-          // Update client data with calculated remaining fuel
-          await updateDoc(doc(db, 'clients', clientDataResult.id), {
-            remainingFuel: remainingFuel
-          });
-        }
-
-        await Promise.all([
-          fetchAttendants(),
-          subscribeToTransactions()
-        ]);
-      } catch (error) {
-        console.error('Error loading initial data:', error);
-        setLastError('Failed to load initial data. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadInitialData();
-  }, [currentUser]);
 
   // Calculate litres when amount or pump price changes
   useEffect(() => {
-    if (amount && pumpPrice && clientData) {
+    if (amount && pumpPrice > 0 && clientData) {
       const amountNum = parseFloat(amount);
       const litres = amountNum / pumpPrice;
       setCalculatedLitres(Number(litres.toFixed(2)));
@@ -234,10 +154,17 @@ const TransactionScreen = () => {
     }
   }, [amount, pumpPrice, clientData]);
 
-  const fetchClientData = async () => {
+  const fetchClientData = useCallback(async () => {
     if (!currentUser?.email) {
       console.log('No user email found');
-      Alert.alert('Error', 'Please sign in again');
+      showUserError('Please sign in again.');
+      setLoading(false);
+      return null;
+    }
+
+    if (!currentUser?.uid) {
+      console.log('No user uid found');
+      showUserError('Please sign in again.');
       setLoading(false);
       return null;
     }
@@ -245,17 +172,28 @@ const TransactionScreen = () => {
     const userEmail = currentUser.email.toLowerCase();
 
     try {
-      const clientsRef = collection(db, 'clients');
-      const q = query(clientsRef, where('email', '==', userEmail));
-      const snapshot = await getDocs(q);
-      
-      if (!snapshot.empty) {
-        const doc = snapshot.docs[0];
-        const data = doc.data();
+      let clientDocId = currentUser.uid;
+      let data: any | null = null;
+
+      const clientRef = doc(db, 'clients', currentUser.uid);
+      const clientSnap = await getDoc(clientRef);
+      if (clientSnap.exists()) {
+        data = clientSnap.data();
+      } else {
+        const clientsRef = collection(db, 'clients');
+        const q = query(clientsRef, where('email', '==', userEmail), limit(1));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          clientDocId = snapshot.docs[0].id;
+          data = snapshot.docs[0].data();
+        }
+      }
+
+      if (data) {
         
         // Ensure vehicle array is properly initialized
         const clientData = {
-        id: doc.id,
+        id: clientDocId,
           ...data,
           balance: Number(data.balance || 0),
           remainingFuel: Number(data.remainingFuel || 0),
@@ -288,15 +226,17 @@ const TransactionScreen = () => {
         return null;
       }
     } catch (error) {
-      console.error('Error fetching client data:', error);
-      Alert.alert('Error', 'Failed to load client data. Please try again.');
+      handleAppError(error, {
+        context: 'Error fetching client data:',
+        userMessage: 'Unable to load your account right now. Please try again.',
+      });
       return null;
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser?.email, currentUser?.uid]);
 
-  const fetchAttendants = async () => {
+  const fetchAttendants = useCallback(async () => {
     try {
       const attendantsRef = collection(db, 'attendants');
       const snapshot = await getDocs(attendantsRef);
@@ -306,14 +246,15 @@ const TransactionScreen = () => {
         status: doc.data().status
       }));
       setAttendants(attendantList);
-      setIsLoadingAttendants(false);
     } catch (error) {
-      console.error('Error fetching attendants:', error);
-      Alert.alert('Error', 'Failed to load attendants');
+      handleAppError(error, {
+        context: 'Error fetching attendants:',
+        userMessage: 'Unable to load attendants right now. Please try again.',
+      });
     }
-  };
+  }, []);
 
-  const subscribeToTransactions = () => {
+  const subscribeToTransactions = useCallback(() => {
     if (!currentUser?.email) return () => {};
 
     setIsLoadingTransactions(true);
@@ -358,18 +299,68 @@ const TransactionScreen = () => {
         console.log(`Fetched ${limitedTransactions.length} transactions`);
       }, 
       (error) => {
-        console.error('Error subscribing to transactions:', error);
+        if (__DEV__) {
+          console.warn('Error subscribing to transactions:', error);
+        }
         setIsLoadingTransactions(false);
-        Alert.alert('Error', 'Failed to load transactions. Please try again.');
+        if ((error as any)?.code === 'permission-denied') {
+          setTransactions([]);
+          if (!hasAlertedTransactionsPermission.current) {
+            hasAlertedTransactionsPermission.current = true;
+            showUserError('Transactions are unavailable right now. Please try again later.');
+          }
+          return;
+        }
+
+        showUserError('Failed to load transactions. Please try again.');
       }
     );
-  };
+  }, [currentUser?.email]);
 
-  const getClientDocRef = () => {
-    if (!currentUser?.email) return null;
-    // Use email as the document ID
-    return doc(db, 'clients', currentUser.email);
-  };
+  useEffect(() => {
+    if (!currentUser) {
+      showUserError('Please sign in to access transactions.');
+      return;
+    }
+
+    // Always clean up any previous snapshot listener before creating a new one.
+    if (unsubscribeTransactionsRef.current) {
+      try {
+        unsubscribeTransactionsRef.current();
+      } catch {}
+      unsubscribeTransactionsRef.current = null;
+    }
+
+    const loadInitialData = async () => {
+      setLoading(true);
+      try {
+        const clientDataResult = await fetchClientData();
+
+        if (clientDataResult) {
+          setCurrentBalance(clientDataResult.balance);
+          setDisplayBalance(clientDataResult.balance);
+        }
+
+        await fetchAttendants();
+        unsubscribeTransactionsRef.current = subscribeToTransactions();
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        setLastError('Unable to load transactions right now. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitialData();
+    return () => {
+      if (unsubscribeTransactionsRef.current) {
+        try {
+          unsubscribeTransactionsRef.current();
+        } catch {}
+        unsubscribeTransactionsRef.current = null;
+      }
+    };
+  }, [currentUser, fetchClientData, fetchAttendants, subscribeToTransactions]);
 
   const validateTransaction = () => {
     if (!amount || !selectedVehicle || !selectedAttendant) {
@@ -385,6 +376,11 @@ const TransactionScreen = () => {
     const requestedAmount = parseFloat(amount);
     const currentBalance = Number(clientData.balance);
     const currentPumpPrice = Number(pumpPrice);
+
+    if (!currentPumpPrice || currentPumpPrice <= 0) {
+      Alert.alert('Error', 'Pump price is not set. Please contact the admin.');
+      return false;
+    }
     
     if (isNaN(requestedAmount) || requestedAmount <= 0) {
       Alert.alert('Error', 'Please enter a valid amount greater than 0');
@@ -398,270 +394,103 @@ const TransactionScreen = () => {
       return false;
     }
 
-    const calculatedLitres = requestedAmount / currentPumpPrice;
-    if (calculatedLitres > clientData.remainingFuel) {
-      Alert.alert('Error',
-        `Insufficient fuel allocation\n\nRequested: ${calculatedLitres.toFixed(2)}L\nAvailable: ${clientData.remainingFuel.toFixed(2)}L`
-      );
-      return false;
-    }
-
     return true;
   };
 
-  const createNotification = async (
-    type: Notification['type'],
-    title: string,
-    message: string,
-    toUserId: string,
-    toUserRole: string,
-    relatedDocId?: string,
-    relatedCollection?: string
-  ) => {
-    try {
-      const notification: Omit<Notification, 'id'> = {
-        type,
-        title,
-        message,
-        fromUserId: currentUser!.uid,
-        fromUserName: clientData!.name,
-        fromUserRole: 'client',
-        toUserId,
-        toUserRole,
-        status: 'unread',
-        createdAt: serverTimestamp(),
-        relatedDocId,
-        relatedCollection
-      };
+const handleCreateTransaction = async () => {
+  if (!validateTransaction()) return;
 
-      await addDoc(collection(db, 'notifications'), notification);
-      console.log('Notification created successfully');
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      Alert.alert('Error', 'Failed to send notification');
-    }
-  };
+  if (!currentUser?.email || !clientData) {
+    showUserError('Please sign in to create a transaction.');
+    return;
+  }
 
-  const sendMessage = async (receiverId: string, receiverName: string, content: string, attachments?: string[]) => {
-    try {
-      const message: Omit<Message, 'id'> = {
-        senderId: currentUser!.uid,
-        senderName: clientData!.name,
-        senderRole: 'client',
-        receiverId,
-        receiverName,
-        content,
-        timestamp: serverTimestamp(),
-        status: 'sent',
-        attachments
-      };
+  try {
+    setIsProcessing(true);
+    const transactionAmount = parseFloat(amount);
+    const userEmail = currentUser.email.toLowerCase();
 
-      await addDoc(collection(db, 'messages'), message);
-      console.log('Message sent successfully');
-    } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message');
-    }
-  };
-
-  const updateUserInformation = async (updates: Partial<ClientData>) => {
-    try {
-      const userRef = doc(db, 'clients', clientData!.id);
-      await updateDoc(userRef, {
-        ...updates,
-        updatedAt: serverTimestamp()
-      });
-
-      // Notify admin about the update
-      await createNotification(
-        'update',
-        'Client Information Updated',
-        `${clientData!.name} has updated their information`,
-        'admin', // Replace with actual admin ID if available
-        'admin',
-        clientData!.id,
-        'clients'
-      );
-
-      console.log('User information updated successfully');
-      Alert.alert('Success', 'Your information has been updated');
-    } catch (error) {
-      console.error('Error updating user information:', error);
-      Alert.alert('Error', 'Failed to update information');
-    }
-  };
-
-  const handleCreateTransaction = async () => {
-    if (!validateTransaction()) return;
-
-    if (!currentUser?.email || !clientData) {
-      Alert.alert('Error', 'Please sign in to create a transaction');
+    if (!pumpPrice || pumpPrice <= 0) {
+      showUserError('Pump price is unavailable right now. Please try again later.');
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      const transactionAmount = parseFloat(amount);
-      const userEmail = currentUser.email.toLowerCase();
-      
-      // Calculate new balance
-      const newBalance = currentBalance - transactionAmount;
-      const newRemainingFuel = newBalance / pumpPrice;
+    const litres = Number((transactionAmount / pumpPrice).toFixed(2));
+    const currentRemainingFuel = currentBalance / pumpPrice;
 
-      // Create transaction ID
-      const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Create transaction ID
+    const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      // Create batch write
-      const batch = writeBatch(db);
+    // Create batch write
+    const batch = writeBatch(db);
 
-      // 1. Update client document using the document ID from clientData
-      const clientRef = doc(db, 'clients', clientData.id);
-      batch.update(clientRef, {
-        balance: newBalance,
-        remainingFuel: newRemainingFuel,
-        updatedAt: serverTimestamp(),
-        fuelWithdrawn: increment(calculatedLitres),
-        litresDrawn: increment(calculatedLitres),
-        totalValue: increment(transactionAmount)
-      });
+    // 1. Create transaction document (global)
+    const transactionRef = doc(db, 'transactions', transactionId);
+    const transactionData = {
+      id: transactionId,
+      amount: transactionAmount,
+      litres,
+      fuelType: selectedFuelType,
+      status: 'pending',
+      vehicle: selectedVehicle,
+      attendantId: selectedAttendant?.id || '',
+      attendantName: selectedAttendant?.name || '',
+      pumpPrice: pumpPrice,
+      clientEmail: userEmail,
+      clientId: clientData.id,
+      clientName: clientData.name,
+      timestamp: serverTimestamp(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      metadata: {
+        clientBalance: currentBalance,
+        remainingFuel: currentRemainingFuel,
+        requestSource: 'mobile_app'
+      },
+      processingSteps: [{
+        step: 'created',
+        timestamp: new Date().toISOString(),
+        status: 'completed'
+      }]
+    };
+    batch.set(transactionRef, transactionData);
 
-      // 2. Create transaction document
-      const transactionRef = doc(db, 'transactions', transactionId);
-      const transactionData = {
-        id: transactionId,
-        amount: transactionAmount,
-        litres: calculatedLitres,
-        fuelType: selectedFuelType,
-        status: 'pending',
-        vehicle: selectedVehicle,
-        attendantId: selectedAttendant?.id || '',
-        attendantName: selectedAttendant?.name || '',
-        pumpPrice: pumpPrice,
-        clientEmail: userEmail,
-        clientId: clientData.id,
-        clientName: clientData.name,
-        timestamp: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        metadata: {
-          clientBalance: newBalance,
-          remainingFuel: newRemainingFuel,
-          requestSource: 'mobile_app'
-        },
-        processingSteps: [{
-          step: 'created',
-          timestamp: new Date().toISOString(),
-          status: 'completed'
-        }]
-      };
-      batch.set(transactionRef, transactionData);
+    // 2. Create transaction copy in client subcollection
+    const clientTransactionRef = doc(db, 'clients', clientData.id, 'transactions', transactionId);
+    batch.set(clientTransactionRef, transactionData);
 
-      // Commit the batch
-      await batch.commit();
+    // 3. Create a client-visible notification entry
+    const clientNotificationRef = doc(db, 'clients', clientData.id, 'notifications', transactionId);
+    batch.set(clientNotificationRef, {
+      message: `Transaction pending: $${transactionAmount.toFixed(2)} (${selectedFuelType})`,
+      createdAt: serverTimestamp(),
+      type: 'transaction',
+      status: 'pending',
+      transactionId,
+      amount: transactionAmount,
+      litres,
+      fuelType: selectedFuelType,
+      read: false,
+    });
 
-      // Update local state
-      setCurrentBalance(newBalance);
-      setDisplayBalance(newBalance);
-      
-      // Update client data in state
-      setClientData(prevData => {
-        if (!prevData) return null;
-        return {
-          ...prevData,
-          balance: newBalance,
-          remainingFuel: newRemainingFuel,
-          fuelWithdrawn: (prevData.fuelWithdrawn || 0) + calculatedLitres,
-          litresDrawn: (prevData.litresDrawn || 0) + calculatedLitres,
-          totalValue: (prevData.totalValue || 0) + transactionAmount
-        };
-      });
-      
-      // Reset form
-      setAmount('');
-      setSelectedVehicle('');
-      setSelectedFuelType('diesel');
-      setSelectedAttendant(null);
+    await batch.commit();
 
-      Alert.alert('Success', 'Transaction created successfully');
+    // Reset form
+    setAmount('');
+    setSelectedVehicle('');
+    setSelectedFuelType('diesel');
+    setSelectedAttendant(null);
 
-    } catch (error) {
-      console.error('Error in transaction:', error);
-      Alert.alert('Error', 'Failed to process transaction. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const generatePDF = async (transaction: Transaction) => {
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: 'Helvetica', sans-serif; padding: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .invoice-details { margin-bottom: 30px; }
-            .table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            .total { margin-top: 20px; text-align: right; }
-            .status { padding: 8px; border-radius: 4px; display: inline-block; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Fuel Transaction Receipt</h1>
-            <p>Invoice Number: ${transaction.id}</p>
-          </div>
-          <div class="invoice-details">
-            <p><strong>Date:</strong> ${format(transaction.timestamp.toDate(), 'MMMM d, yyyy HH:mm')}</p>
-            <p><strong>Client:</strong> ${transaction.clientName}</p>
-            <p><strong>Station:</strong> ${transaction.attendantName}</p>
-            <p><strong>Status:</strong> <span class="status" style="background-color: ${
-              transaction.status === 'approved' ? '#4CAF50' : 
-              transaction.status === 'rejected' ? '#FF0000' : '#FFA500'
-            }; color: white;">${transaction.status.toUpperCase()}</span></p>
-          </div>
-          <table class="table">
-            <tr>
-              <th>Description</th>
-              <th>Quantity</th>
-              <th>Price/L</th>
-              <th>Amount</th>
-            </tr>
-            <tr>
-              <td>Fuel Purchase</td>
-              <td>${transaction.litres.toFixed(2)} L</td>
-              <td>$${transaction.pumpPrice.toFixed(2)}</td>
-              <td>$${transaction.amount.toFixed(2)}</td>
-            </tr>
-          </table>
-          <div class="total">
-            <h3>Total Amount: $${transaction.amount.toFixed(2)}</h3>
-          </div>
-          ${transaction.notes ? `<p><strong>Notes:</strong> ${transaction.notes}</p>` : ''}
-        </body>
-      </html>
-    `;
-
-    try {
-      const { uri } = await Print.printToFileAsync({
-        html: htmlContent,
-        base64: false
-      });
-
-      if (Platform.OS === 'ios') {
-        await Sharing.shareAsync(uri);
-      } else {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Download Receipt'
-        });
-      }
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      Alert.alert('Error', 'Failed to generate receipt');
-    }
-  };
+    showUserSuccess('Transaction created successfully');
+  } catch (error) {
+    handleAppError(error, {
+      context: 'Error in transaction:',
+      userMessage: 'Could not create your transaction right now. Please try again.',
+    });
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -678,22 +507,9 @@ const TransactionScreen = () => {
     }
   };
 
-  const getStatusMessage = (transaction: Transaction) => {
-    switch (transaction.status) {
-      case 'approved':
-        return `Approved by ${transaction.attendantName}`;
-      case 'rejected':
-        return `Rejected by ${transaction.attendantName}`;
-      case 'pending':
-        return `Awaiting approval from ${transaction.attendantName}`;
-      default:
-        return '';
-    }
-  };
-
   const saveDraftTransaction = async () => {
     if (!currentUser?.email || !clientData) {
-      Alert.alert('Error', 'Please sign in to save draft');
+      showUserError('Please sign in again.');
       return;
     }
 
@@ -719,7 +535,7 @@ const TransactionScreen = () => {
         timestamp: now,
         createdAt: now,
         updatedAt: now,
-        clientId: currentUser.email,
+        clientId: clientData.id,
         clientName: clientData.name,
         clientEmail: currentUser.email,
         isDraft: true,
@@ -738,7 +554,7 @@ const TransactionScreen = () => {
 
       // Save draft directly to client's drafts subcollection
       await setDoc(
-        doc(db, `clients/${currentUser.email}/drafts/${draftId}`),
+        doc(db, `clients/${clientData.id}/drafts/${draftId}`),
         draftData
       );
 
@@ -748,11 +564,13 @@ const TransactionScreen = () => {
       setSelectedFuelType('diesel');
       setSelectedAttendant(null);
 
-      Alert.alert('Success', 'Draft saved successfully');
+      showUserSuccess('Draft saved successfully');
 
     } catch (error) {
-      console.error('Error saving draft:', error);
-      Alert.alert('Error', 'Failed to save draft. Please try again.');
+      handleAppError(error, {
+        context: 'Error saving draft:',
+        userMessage: 'Could not save draft right now. Please try again.',
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -791,23 +609,25 @@ const TransactionScreen = () => {
       };
 
       // Delete the draft first
-      const draftRef = doc(db, `clients/${currentUser?.email}/drafts/${draft.id}`);
+      const draftRef = doc(db, `clients/${clientData?.id}/drafts/${draft.id}`);
       await deleteDoc(draftRef);
 
       // Then create the new transaction
       const clientTransactionRef = doc(db, 
-        `clients/${currentUser?.email}/transactions/${transactionId}`);
+        `clients/${clientData?.id}/transactions/${transactionId}`);
       
       await setDoc(clientTransactionRef, transactionData);
 
-      Alert.alert('Success', 'Transaction created successfully');
+      showUserSuccess('Transaction created successfully');
 
     } catch (error) {
-      console.error('Error creating transaction:', error);
-      Alert.alert('Error', 'Failed to create transaction');
+      handleAppError(error, {
+        context: 'Error creating transaction from draft:',
+        userMessage: 'Could not create your transaction right now. Please try again.',
+      });
       // Refresh drafts list in case of error
       const draftsQuery = query(
-        collection(db, `clients/${currentUser?.email}/drafts`),
+        collection(db, `clients/${clientData?.id}/drafts`),
         orderBy('lastModified', 'desc')
       );
       const snapshot = await getDocs(draftsQuery);
@@ -834,12 +654,14 @@ const TransactionScreen = () => {
     // Delete the draft after loading its data
     const deleteDraft = async () => {
       try {
-        const draftRef = doc(db, `clients/${currentUser?.email}/drafts/${draft.id}`);
+        const draftRef = doc(db, `clients/${clientData?.id}/drafts/${draft.id}`);
         await deleteDoc(draftRef);
         setDraftTransactions(prev => prev.filter(d => d.id !== draft.id));
       } catch (error) {
-        console.error('Error deleting draft:', error);
-        Alert.alert('Error', 'Failed to delete draft');
+        handleAppError(error, {
+          context: 'Error deleting draft:',
+          userMessage: 'Could not delete draft right now. Please try again.',
+        });
       }
     };
 
@@ -852,11 +674,11 @@ const TransactionScreen = () => {
   };
 
   useEffect(() => {
-    if (!currentUser?.email) return;
+    if (!currentUser?.uid || !clientData?.id) return;
 
     // Subscribe to drafts in client's subcollection
     const draftsQuery = query(
-      collection(db, `clients/${currentUser.email}/drafts`),
+      collection(db, `clients/${clientData.id}/drafts`),
       orderBy('lastModified', 'desc')
     );
 
@@ -868,11 +690,11 @@ const TransactionScreen = () => {
       setDraftTransactions(draftsList);
     }, (error) => {
       console.error('Error subscribing to drafts:', error);
-      Alert.alert('Error', 'Failed to load drafts');
+      showUserError('Failed to load drafts. Please try again.');
     });
 
     return () => unsubscribe();
-  }, [currentUser?.email]);
+  }, [currentUser?.uid, clientData?.id]);
 
   const renderAttendantSelector = () => (
     <View style={styles.pickerContainer}>
@@ -973,7 +795,7 @@ const TransactionScreen = () => {
             </View>
             <View style={styles.draftDetails}>
               <Text style={styles.draftLitres}>
-                {draft.litres.toFixed(2)}L @ ${draft.pumpPrice.toFixed(2)}/L
+                ${draft.amount.toFixed(2)} @ ${draft.pumpPrice.toFixed(2)}/L
               </Text>
               <Text style={styles.draftDate}>
                 {format(draft.lastModified.toDate(), 'MMM d, yyyy HH:mm')}
@@ -1023,7 +845,7 @@ const TransactionScreen = () => {
           let date: Date;
           try {
             date = item.timestamp?.toDate?.() || new Date();
-          } catch (error) {
+          } catch {
             console.warn('Invalid timestamp for transaction:', item.id);
             date = new Date();
           }
@@ -1039,7 +861,7 @@ const TransactionScreen = () => {
                 </View>
                 <View style={[
                   styles.statusBadge,
-                  { backgroundColor: getStatusColor(item.status) }
+                  { backgroundColor: getStatusColor(item.status) },
                 ]}>
                   <Icon
                     name={
@@ -1060,11 +882,11 @@ const TransactionScreen = () => {
                 <View style={styles.detailRow}>
                   <Icon name="water-outline" size={18} color="#666666" />
                   <Text style={styles.transactionDetail}>
-                    {item.litres.toFixed(2)} L of {item.fuelType}
+                    ${item.amount.toFixed(2)} ({item.fuelType})
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Icon name="car-outline" size={18} color="#666666" />
+                  <Icon name="pricetag-outline" size={18} color="#666666" />
                   <Text style={styles.transactionDetail}>
                     Vehicle: {item.vehicle}
                   </Text>
@@ -1081,136 +903,125 @@ const TransactionScreen = () => {
         })}
       </View>
     );
-  };
+};
 
-  const renderTransactionForm = () => (
-    <View style={styles.formContainer}>
-      <Text style={styles.formTitle}>New Transaction</Text>
-      
-      {/* Always visible balance */}
-      <View style={styles.balanceContainer}>
-        <Text style={styles.balanceLabel}>Current Balance:</Text>
-        <Text style={styles.balanceAmount}>${displayBalance.toFixed(2)}</Text>
-      </View>
+const renderTransactionForm = () => (
+  <View style={styles.formContainer}>
+    <Text style={styles.formTitle}>New Transaction</Text>
+    
+    {/* Always visible balance */}
+    <View style={styles.balanceContainer}>
+      <Text style={styles.balanceLabel}>Current Balance:</Text>
+      <Text style={styles.balanceAmount}>${displayBalance.toFixed(2)}</Text>
+    </View>
 
-      {renderFuelTypeSelector()}
-      {renderVehicleSelector()}
-      
-      <TextInput
-        style={[styles.input, !isAmountValid && styles.invalidInput]}
-        placeholder="Enter Amount ($)"
-        value={amount}
-        onChangeText={setAmount}
-        keyboardType="numeric"
-        placeholderTextColor="#999"
-      />
+    {renderFuelTypeSelector()}
+    {renderVehicleSelector()}
+    
+    <TextInput
+      style={[styles.input, !isAmountValid && styles.invalidInput]}
+      placeholder="Enter Amount ($)"
+      value={amount}
+      onChangeText={setAmount}
+      keyboardType="numeric"
+      placeholderTextColor="#999"
+    />
 
-      {amount !== '' && (
-        <View style={styles.calculationContainer}>
-          <Text style={[
-            styles.calculationText,
-            !isAmountValid && styles.invalidText
-          ]}>
-            Calculated Litres: {calculatedLitres.toFixed(2)}L
-          </Text>
-        </View>
-      )}
+    {renderAttendantSelector()}
+    {renderFormButtons()}
+  </View>
+);
 
-      {renderAttendantSelector()}
-      {renderFormButtons()}
+if (!currentUser) {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.errorText}>Please sign in to view transactions</Text>
     </View>
   );
+}
 
-  if (!currentUser) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Please sign in to view transactions</Text>
-      </View>
-    );
-  }
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6A0DAD" />
-      </View>
-    );
-  }
-
-  if (lastError) {
-  return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{lastError}</Text>
-            <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => {
-            setLastError(null);
-            fetchClientData();
-          }}
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-    );
-  }
-
+if (loading) {
   return (
     <View style={styles.mainContainer}>
-      {/* Background Circles */}
-      <View style={styles.backgroundCircle1} />
-      <View style={styles.backgroundCircle2} />
-      <View style={styles.backgroundCircle3} />
-      
+      <ActivityIndicator size="large" color="#6A0DAD" />
+    </View>
+  );
+}
+
+if (lastError) {
+  return (
+    <View style={styles.errorContainer}>
+      <Text style={styles.errorText}>{lastError}</Text>
+      <TouchableOpacity
+        style={styles.retryButton}
+        onPress={() => {
+          setLastError(null);
+          fetchClientData();
+        }}
+      >
+        <Text style={styles.retryButtonText}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+return (
+  <View style={styles.mainContainer}>
+    {/* Background Circles */}
+    <View style={styles.backgroundCircle1} />
+    <View style={styles.backgroundCircle2} />
+    <View style={styles.backgroundCircle3} />
+    
     <ScrollView 
       ref={scrollViewRef}
       style={styles.container}
     >
-        {/* Current Balance and Fuel Info */}
-        <LinearGradient
-          colors={['#8A2BE2', '#6A0DAD']}
-          style={styles.gradientHeader}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>{clientData?.name || 'Welcome'}</Text>
-            <View style={styles.infoContainer}>
-              <View style={styles.infoCard}>
-                <Icon name="wallet-outline" size={24} color="#FFFFFF" style={styles.cardIcon} />
-                <Text style={styles.infoLabel}>Current Balance</Text>
-                <Text style={styles.infoValue}>
-                  ${currentBalance.toFixed(2)}
-                </Text>
-                <Text style={styles.infoSubtext}>Available Funds</Text>
-              </View>
-              <View style={styles.infoCard}>
-                <Icon name="gas-station-outline" size={24} color="#FFFFFF" style={styles.cardIcon} />
-                <Text style={styles.infoLabel}>Remaining Fuel</Text>
-                <Text style={styles.infoValue}>
-                  {(currentBalance / pumpPrice).toFixed(2)}L
-                </Text>
-                <Text style={styles.infoSubtext}>Based on Current Balance</Text>
-              </View>
+      {/* Current Balance and Fuel Info */}
+      <LinearGradient
+        colors={['#8A2BE2', '#6A0DAD']}
+        style={styles.gradientHeader}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>{clientData?.name || 'Welcome'}</Text>
+          <View style={styles.infoContainer}>
+            <View style={styles.infoCard}>
+              <Icon name="wallet-outline" size={24} color="#FFFFFF" style={styles.cardIcon} />
+              <Text style={styles.infoLabel}>Current Balance</Text>
+              <Text style={styles.infoValue}>
+                ${currentBalance.toFixed(2)}
+              </Text>
+              <Text style={styles.infoSubtext}>Available Funds</Text>
+            </View>
+            <View style={styles.infoCard}>
+              <Icon name="gas-station-outline" size={24} color="#FFFFFF" style={styles.cardIcon} />
+              <Text style={styles.infoLabel}>Pump Price</Text>
+              <Text style={styles.infoValue}>
+                ${pumpPrice.toFixed(2)}/L
+              </Text>
+              <Text style={styles.infoSubtext}>Current Station Rate</Text>
             </View>
           </View>
-        </LinearGradient>
-
-        {/* Client Details Summary with icons */}
-        <View style={styles.clientInfoCard}>
-          <Text style={styles.sectionTitle}>Client Details</Text>
-          <View style={styles.clientInfoRow}>
-            <Icon name="receipt-outline" size={20} color="#6A0DAD" />
-            <Text style={styles.clientInfoTextStyle}>VAT: {clientData?.vatNumber || 'N/A'}</Text>
-          </View>
-          <View style={styles.clientInfoRow}>
-            <Icon name="document-text-outline" size={20} color="#6A0DAD" />
-            <Text style={styles.clientInfoTextStyle}>TIN: {clientData?.tinNumber || 'N/A'}</Text>
-          </View>
-          <View style={styles.clientInfoRow}>
-            <Icon name="pricetag-outline" size={20} color="#6A0DAD" />
-            <Text style={styles.clientInfoTextStyle}>Pump Price: ${pumpPrice.toFixed(2)}/L</Text>
-          </View>
         </View>
+      </LinearGradient>
+
+      {/* Client Details Summary with icons */}
+      <View style={styles.clientInfoCard}>
+        <Text style={styles.sectionTitle}>Client Details</Text>
+        <View style={styles.clientInfoRow}>
+          <Icon name="receipt-outline" size={20} color="#6A0DAD" />
+          <Text style={styles.clientInfoTextStyle}>VAT: {clientData?.vatNumber || 'N/A'}</Text>
+        </View>
+        <View style={styles.clientInfoRow}>
+          <Icon name="document-text-outline" size={20} color="#6A0DAD" />
+          <Text style={styles.clientInfoTextStyle}>TIN: {clientData?.tinNumber || 'N/A'}</Text>
+        </View>
+        <View style={styles.clientInfoRow}>
+          <Icon name="pricetag-outline" size={20} color="#6A0DAD" />
+          <Text style={styles.clientInfoTextStyle}>Pump Price: ${pumpPrice.toFixed(2)}/L</Text>
+        </View>
+      </View>
 
       {/* New Transaction Form */}
       {renderTransactionForm()}
@@ -1225,7 +1036,7 @@ const TransactionScreen = () => {
         {renderTransactionList()}
       </View>
     </ScrollView>
-    </View>
+  </View>
   );
 };
 

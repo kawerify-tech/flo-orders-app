@@ -13,6 +13,7 @@ import {
 import { collection, query, getDocs, orderBy, DocumentData } from 'firebase/firestore';
 import { db } from '../../lib/firebaseConfig';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
 
 interface Client {
   id: string;
@@ -215,56 +216,60 @@ const ClientList: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6A0DAD" />
-        <Text style={styles.loadingText}>Loading clients...</Text>
-      </View>
+      <SafeAreaLayout>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6A0DAD" />
+          <Text style={styles.loadingText}>Loading clients...</Text>
+        </View>
+      </SafeAreaLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Client Fuel Status</Text>
-      </View>
+    <SafeAreaLayout>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerText}>Client Fuel Status</Text>
+        </View>
 
-      <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name or email..."
-          value={searchQuery}
-          onChangeText={handleSearch}
-          placeholderTextColor="#999"
+        <View style={styles.searchContainer}>
+          <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by name or email..."
+            value={searchQuery}
+            onChangeText={handleSearch}
+            placeholderTextColor="#999"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearch('')}
+              style={styles.clearButton}
+            >
+              <Icon name="close-circle" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <FlatList
+          contentContainerStyle={styles.listContent}
+          data={filteredClients}
+          keyExtractor={(item: Client) => item.id}
+          renderItem={renderClient}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {searchQuery 
+                  ? 'No clients found matching your search'
+                  : 'No clients available'}
+              </Text>
+            </View>
+          }
         />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity
-            onPress={() => handleSearch('')}
-            style={styles.clearButton}
-          >
-            <Icon name="close-circle" size={20} color="#666" />
-          </TouchableOpacity>
-        )}
       </View>
-
-      <FlatList
-        contentContainerStyle={styles.listContent}
-        data={filteredClients}
-        keyExtractor={(item: Client) => item.id}
-        renderItem={renderClient}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {searchQuery 
-                ? 'No clients found matching your search'
-                : 'No clients available'}
-            </Text>
-          </View>
-        }
-      />
-    </View>
+    </SafeAreaLayout>
   );
 };
 

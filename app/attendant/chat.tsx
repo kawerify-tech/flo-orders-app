@@ -9,7 +9,7 @@ import {
   getStatusRef, getUserRef, ref, onValue, push,
   set, serverTimestamp, update, onDisconnect, get
 } from '../../lib/firebaseConfig';
-import { format, isSameDay } from 'date-fns';
+import { format } from 'date-fns';
 
 interface Message {
   id: string;
@@ -35,12 +35,14 @@ const AttendantChat: React.FC<Props> = ({ adminId, adminName }) => {
   const flatListRef = useRef<FlatList>(null);
   const currentUser = auth.currentUser;
 
-  if (!currentUser) {
-    Alert.alert('Error', 'Attendant must be signed in.');
-    return null;
-  }
+  useEffect(() => {
+    if (!currentUser) {
+      Alert.alert('Error', 'Attendant must be signed in.');
+    }
+  }, [currentUser]);
 
   useEffect(() => {
+    if (!currentUser) return;
     const attendantStatusRef = getUserRef(currentUser.uid);
     const connectedRef = ref(database, '.info/connected');
 
@@ -69,14 +71,17 @@ const AttendantChat: React.FC<Props> = ({ adminId, adminName }) => {
     });
 
     return () => {
-      update(attendantStatusRef, {
-        status: 'offline',
-        lastSeen: serverTimestamp()
-      });
+      if (auth.currentUser?.uid === currentUser.uid) {
+        update(attendantStatusRef, {
+          status: 'offline',
+          lastSeen: serverTimestamp()
+        });
+      }
     };
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
+    if (!currentUser) return;
     const chatId = [currentUser.uid, adminId].sort().join('_');
     const messagesRef = getMessagesRef(chatId);
     const adminStatusRef = getStatusRef(adminId);
@@ -119,9 +124,13 @@ const AttendantChat: React.FC<Props> = ({ adminId, adminName }) => {
       statusUnsub();
       messageUnsub();
     };
-  }, [adminId]);
+  }, [adminId, currentUser]);
 
   const handleSend = async () => {
+    if (!currentUser) {
+      Alert.alert('Error', 'Attendant must be signed in.');
+      return;
+    }
     if (!input.trim()) return;
 
     const chatId = [currentUser.uid, adminId].sort().join('_');
@@ -243,9 +252,6 @@ const AttendantChat: React.FC<Props> = ({ adminId, adminName }) => {
 
   const formatTime = (timestamp: number) =>
     timestamp ? format(new Date(timestamp), 'h:mm a') : '';
-
-  const formatDate = (timestamp: number) =>
-    timestamp ? format(new Date(timestamp), 'MMMM d, yyyy') : '';
 
   return (
     <KeyboardAvoidingView

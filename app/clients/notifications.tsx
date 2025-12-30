@@ -1,21 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
-import { db } from '../../lib/firebaseConfig';
-import { collection, query, orderBy, onSnapshot, Timestamp, getDocs, limit, doc } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
+import { auth, db } from '../../lib/firebaseConfig';
+import { DocumentData, QueryDocumentSnapshot, Timestamp, collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { commonStyles } from '../../constants/theme';
 import { useRouter } from 'expo-router';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
 
 interface Notification {
   id: string;
+  type: 'transaction' | 'system';
   message: string;
   timestamp: Timestamp;
-  type: 'transaction' | 'system' | 'alert';
   status: 'pending' | 'approved' | 'rejected' | 'completed';
   transactionId?: string;
   amount?: number;
-  litres?: number;
   fuelType?: 'diesel' | 'blend';
+  litres?: number;
+  pumpPrice?: number;
+  vehicle?: string;
+  attendantName?: string;
+  attendantId?: string;
   read: boolean;
 }
 
@@ -24,100 +29,125 @@ const NotificationScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const auth = getAuth();
   const router = useRouter();
 
-  const subscribeToNotifications = useCallback((userEmail: string) => {
-    if (!userEmail) return () => {};
+  const subscribeToNotifications = useCallback((userUid: string, userEmail?: string | null) => {
+    if (!userUid) return () => {};
 
-    try {
-      const email = userEmail.toLowerCase();
-      const clientRef = doc(db, 'clients', email);
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
 
-      // Subscribe to client's transactions subcollection
-      const transactionsRef = collection(clientRef, 'transactions');
-      const transactionsQuery = query(
-        transactionsRef,
-        orderBy('timestamp', 'desc'),
-        limit(20)
-      );
+    const setup = async () => {
+      try {
+        let clientDocId = userUid;
 
-      return onSnapshot(
-        transactionsQuery,
-        async (transactionSnapshot) => {
-          try {
-          const transactionNotifications = transactionSnapshot.docs.map(doc => {
-            const data = doc.data();
-            const timestamp = data.timestamp instanceof Timestamp 
-              ? data.timestamp 
-              : Timestamp.now();
+        const byUidRef = doc(db, 'clients', userUid);
+        const byUidSnap = await getDoc(byUidRef);
+        if (!byUidSnap.exists() && userEmail) {
+          const clientsRef = collection(db, 'clients');
+          const q = query(clientsRef, where('email', '==', userEmail.toLowerCase()), limit(1));
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            clientDocId = snapshot.docs[0].id;
+          }
+        }
 
-            return {
-              id: doc.id,
-              type: 'transaction' as const,
-              message: `Transaction ${data.status}: ${data.litres}L of ${data.fuelType}`,
-                timestamp,
-              status: data.status as 'pending' | 'approved' | 'rejected' | 'completed',
-              transactionId: doc.id,
-              amount: data.amount || 0,
-              litres: data.litres || 0,
-              fuelType: data.fuelType as 'diesel' | 'blend',
-              read: false
-              };
-          });
+        const clientRef = doc(db, 'clients', clientDocId);
 
-            // Get system notifications
-          const notificationsRef = collection(clientRef, 'notifications');
-          const notificationsQuery = query(
-            notificationsRef,
-            orderBy('createdAt', 'desc'),
-            limit(20)
-          );
+        const normalizedEmail = (userEmail || '').toLowerCase();
+        if (!normalizedEmail) {
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
 
-            const notificationSnapshot = await getDocs(notificationsQuery);
-              const systemNotifications = notificationSnapshot.docs.map(doc => {
-                const data = doc.data();
-                const timestamp = data.createdAt instanceof Timestamp 
-                  ? data.createdAt 
-                  : Timestamp.now();
+        // Subscribe to global transactions (same source as transaction history) so every transaction appears here.
+        // Avoid orderBy here to prevent requiring composite indexes; sort client-side instead.
+        const transactionsRef = collection(db, 'transactions');
+        const transactionsQuery = query(transactionsRef, where('clientEmail', '==', normalizedEmail), limit(200));
 
-                return {
-                  id: doc.id,
-                  type: 'system' as const,
-                  message: data.message || '',
-                timestamp,
-                  status: 'pending' as const,
-                  read: data.read || false
-              };
-              });
+        unsubscribe = onSnapshot(
+          transactionsQuery,
+          async (transactionSnapshot) => {
+            try {
+              const transactionNotifications = transactionSnapshot.docs
+                .map((txDoc) => {
+                  const data = txDoc.data() as any;
+                  const timestamp = data.timestamp instanceof Timestamp ? data.timestamp : Timestamp.now();
 
-              const allNotifications = [...transactionNotifications, ...systemNotifications]
+                  return {
+                    id: txDoc.id,
+                    type: 'transaction' as const,
+                    message: `Transaction ${String(data.status || 'pending')}: $${Number(data.amount || 0).toFixed(2)}`,
+                    timestamp,
+                    status: (data.status || 'pending') as 'pending' | 'approved' | 'rejected' | 'completed',
+                    transactionId: data.id || txDoc.id,
+                    amount: Number(data.amount || 0),
+                    fuelType: data.fuelType as 'diesel' | 'blend',
+                    litres: data.litres !== undefined ? Number(data.litres) : undefined,
+                    pumpPrice: data.pumpPrice !== undefined ? Number(data.pumpPrice) : undefined,
+                    vehicle: data.vehicle || undefined,
+                    attendantName: data.attendantName || undefined,
+                    attendantId: data.attendantId || undefined,
+                    read: false,
+                  };
+                })
                 .sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
 
+              // Get system notifications (client subcollection)
+              const notificationsRef = collection(clientRef, 'notifications');
+              const notificationsQuery = query(notificationsRef, orderBy('createdAt', 'desc'), limit(50));
+
+              const notificationSnapshot = await getDocs(notificationsQuery);
+              const systemNotifications = notificationSnapshot.docs.map((nDoc: QueryDocumentSnapshot<DocumentData>) => {
+                const data = nDoc.data();
+                const timestamp = data.createdAt instanceof Timestamp ? data.createdAt : Timestamp.now();
+
+                return {
+                  id: nDoc.id,
+                  type: 'system' as const,
+                  message: data.message || '',
+                  timestamp,
+                  status: 'pending' as const,
+                  read: data.read || false,
+                };
+              });
+
+              const allNotifications = [...transactionNotifications, ...systemNotifications].sort(
+                (a, b) => b.timestamp.seconds - a.timestamp.seconds
+              );
+
               setNotifications(allNotifications);
-            setError(null);
-          } catch (err) {
-            console.error('Error processing notifications:', err);
-            setError('Error processing notifications');
-          } finally {
+              setError(null);
+            } catch (err) {
+              console.error('Error processing notifications:', err);
+              setError('Notifications are unavailable right now. Please try again.');
+            } finally {
               setLoading(false);
               setRefreshing(false);
             }
-        },
-        (error) => {
-          console.error('Error subscribing to notifications:', error);
-          setError('Failed to load notifications');
-          setLoading(false);
-          setRefreshing(false);
-        }
-      );
-    } catch (error) {
-      console.error('Error setting up notifications:', error);
-      setError('Failed to setup notifications');
-      setLoading(false);
-      setRefreshing(false);
-      return () => {};
-    }
+          },
+          (err) => {
+            console.error('Error subscribing to notifications:', err);
+            setError('Notifications are unavailable right now. Please try again.');
+            setLoading(false);
+            setRefreshing(false);
+          }
+        );
+      } catch (err) {
+        console.error('Error setting up notifications:', err);
+        setError('Notifications are unavailable right now. Please try again.');
+        setLoading(false);
+        setRefreshing(false);
+      }
+    };
+
+    setup();
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -131,11 +161,19 @@ const NotificationScreen = () => {
       unsubscribeAuth = auth.onAuthStateChanged((user) => {
         if (!isMounted) return;
 
-        if (user?.email) {
-          console.log('Fetching notifications for:', user.email);
-          unsubscribeNotifications = subscribeToNotifications(user.email);
+        if (user?.uid) {
+          console.log('Fetching notifications for:', user.uid);
+          unsubscribeNotifications = subscribeToNotifications(user.uid, user.email);
         } else {
           console.log('No authenticated user');
+          if (unsubscribeNotifications) {
+            try {
+              unsubscribeNotifications();
+            } catch (e) {
+              console.warn('Error unsubscribing notifications listener:', e);
+            }
+            unsubscribeNotifications = undefined;
+          }
           setLoading(false);
           router.replace("/signin");
         }
@@ -154,8 +192,8 @@ const NotificationScreen = () => {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     const user = auth.currentUser;
-    if (user?.email) {
-      subscribeToNotifications(user.email);
+    if (user?.uid) {
+      subscribeToNotifications(user.uid, user.email);
     } else {
       setRefreshing(false);
       Alert.alert('Error', 'Please login again');
@@ -166,12 +204,23 @@ const NotificationScreen = () => {
   // Add error boundary
   if (!auth.currentUser) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaLayout>
         <View style={styles.errorContainer}>
           <Icon name="alert-circle-outline" size={48} color="#FF5252" />
           <Text style={styles.errorText}>Please sign in to view notifications</Text>
         </View>
-      </SafeAreaView>
+      </SafeAreaLayout>
+    );
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaLayout>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6A0DAD" />
+          <Text style={styles.loadingText}>Loading notifications...</Text>
+        </View>
+      </SafeAreaLayout>
     );
   }
 
@@ -181,8 +230,6 @@ const NotificationScreen = () => {
         return 'card-outline';
       case 'system':
         return 'settings-outline';
-      case 'alert':
-        return 'alert-circle-outline';
       default:
         return 'notifications-outline';
     }
@@ -203,9 +250,13 @@ const NotificationScreen = () => {
     }
   };
 
+  const getNotificationKey = (notification: Notification) => {
+    return `${notification.type}:${notification.id}`;
+  };
+
   const renderNotification = (notification: Notification) => (
     <View 
-      key={notification.id} 
+      key={getNotificationKey(notification)} 
       style={[
         styles.notificationCard,
         !notification.read && styles.unreadNotification
@@ -233,14 +284,9 @@ const NotificationScreen = () => {
 
       {notification.type === 'transaction' && (
         <View style={styles.transactionDetails}>
-          {notification.amount && (
+          {notification.amount !== undefined && (
             <Text style={styles.detailText}>
               Amount: ${notification.amount.toFixed(2)}
-            </Text>
-          )}
-          {notification.litres && (
-            <Text style={styles.detailText}>
-              Litres: {notification.litres.toFixed(2)}L
             </Text>
           )}
           {notification.fuelType && (
@@ -261,20 +307,19 @@ const NotificationScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Background Circles */}
-      <View style={styles.circle1} />
-      <View style={styles.circle2} />
-      <View style={styles.circle3} />
+    <SafeAreaLayout>
+      <View style={styles.backgroundDecoration}>
+        <View style={styles.circle1} />
+        <View style={styles.circle2} />
+        <View style={styles.circle3} />
+      </View>
 
-      {/* Fixed Header */}
       <View style={styles.headerContainer}>
         <Text style={styles.header}>Notifications</Text>
       </View>
 
-      {/* Scrollable Content */}
-      <ScrollView 
-        style={styles.scrollContainer} 
+      <ScrollView
+        style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
@@ -283,12 +328,9 @@ const NotificationScreen = () => {
             colors={['#6A0DAD']}
           />
         }
+        showsVerticalScrollIndicator={false}
       >
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading notifications...</Text>
-          </View>
-        ) : notifications.length > 0 ? (
+        {notifications.length > 0 ? (
           notifications.map(renderNotification)
         ) : (
           <View style={styles.emptyContainer}>
@@ -297,13 +339,17 @@ const NotificationScreen = () => {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  backgroundDecoration: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#F5F5F5',
   },
   headerContainer: {
@@ -331,7 +377,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingTop: 5,
+    paddingTop: 16,
+    flexGrow: 1,
+    paddingBottom: 32,
   },
   circle1: {
     position: 'absolute',
@@ -399,15 +447,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   notificationCard: {
-    backgroundColor: '#FFF',
+    ...commonStyles.glassCard,
     borderRadius: 15,
     padding: 20,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
   },
   notificationText: {
     fontSize: 16,

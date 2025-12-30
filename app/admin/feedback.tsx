@@ -16,6 +16,7 @@ import {
 import {
   collection,
   addDoc,
+  doc,
   query,
   orderBy,
   onSnapshot,
@@ -28,6 +29,8 @@ import { db } from '../../lib/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { logClientFeedback } from '../../lib/activityLogger';
+import { commonStyles } from '../../constants/theme';
+import { SafeAreaLayout } from '../../components/SafeAreaLayout';
 
 // Types
 interface FeedbackItem {
@@ -108,13 +111,14 @@ const AdminFeedback = () => {
     }
 
     try {
-      await addDoc(collection(db, 'notifications'), {
+      const clientRef = doc(db, 'clients', selectedClient.id);
+      await addDoc(collection(clientRef, 'notifications'), {
         clientId: selectedClient.id,
         clientName: selectedClient.name,
         message: notificationText.trim(),
-        timestamp: serverTimestamp(),
+        createdAt: serverTimestamp(),
         type: 'feedback_request',
-        status: 'unread'
+        read: false,
       });
 
       Alert.alert('Success', 'Feedback request sent successfully!');
@@ -198,29 +202,31 @@ const AdminFeedback = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={['#6A0DAD']}
-          />
-        }
+    <SafeAreaLayout>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
       >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Feedback Management</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setShowNotificationForm(!showNotificationForm)}
-            >
-              <Ionicons name={showNotificationForm ? 'close' : 'add'} size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={['#6A0DAD']}
+            />
+          }
+        >
+          <View style={styles.content}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Feedback Management</Text>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => setShowNotificationForm(!showNotificationForm)}
+              >
+                <Ionicons name={showNotificationForm ? 'close' : 'add'} size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
 
           {showNotificationForm && (
             <View style={styles.notificationForm}>
@@ -285,8 +291,9 @@ const AdminFeedback = () => {
             )}
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaLayout>
   );
 };
 
@@ -295,8 +302,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FA',
   },
-  content: {
+  scrollContent: {
+    flexGrow: 1,
     padding: 16,
+    paddingBottom: 32,
+  },
+  content: {
+    padding: 0,
   },
   header: {
     flexDirection: 'row',
@@ -323,15 +335,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   notificationForm: {
-    backgroundColor: '#FFFFFF',
+    ...commonStyles.glassCard,
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
   },
   formLabel: {
     fontSize: 18,
@@ -398,15 +405,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   feedbackCard: {
-    backgroundColor: '#FFFFFF',
+    ...commonStyles.glassCard,
     borderRadius: 16,
     padding: 20,
     marginBottom: 15,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
   },
   feedbackHeader: {
     flexDirection: 'row',

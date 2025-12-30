@@ -15,13 +15,22 @@ export function NavigationGuard() {
   const pathname = usePathname();
   const { user, userRole } = useAuth();
 
+  const safeJsonParse = (raw: string | null) => {
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
   useEffect(() => {
     // Prevent going back to signin when signed in
     const checkAuthState = async () => {
       try {
         // Enforce legal acceptance gate for all users
         const acceptanceRaw = await AsyncStorage.getItem(LEGAL.acceptanceStorageKey);
-        const acceptance = acceptanceRaw ? JSON.parse(acceptanceRaw) : null;
+        const acceptance = safeJsonParse(acceptanceRaw);
         const isLegalAccepted = Boolean(acceptance && acceptance.agreementId === LEGAL.agreementId);
 
         const isAllowedWithoutAcceptance =
