@@ -5,6 +5,7 @@ module.exports = {
     version: "1.0.0",
     scheme: "floorders",
     platforms: ["ios", "android"],
+    newArchEnabled: false,
     orientation: "default",
     icon: "./assets/images/favicon.png",
     userInterfaceStyle: "automatic",
@@ -99,11 +100,9 @@ module.exports = {
         {
           ios: {
             deploymentTarget: "15.1",
-            newArchEnabled: false,
             flipper: false
           },
           android: {
-            newArchEnabled: false,
             compileSdkVersion: 35,
             targetSdkVersion: 35,
             minSdkVersion: 24
