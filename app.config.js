@@ -24,7 +24,7 @@ module.exports = {
         foregroundImage: "./assets/images/favicon.png",
         backgroundColor: "#ffffff"
       },
-      googleServicesFile: "./android/app/google-services.json",
+      googleServicesFile: "./app/google-services.json",
       // Privacy Policy URL - REQUIRED for Google Play Store submission
       privacy: "https://kawerifytech.com/privacy-policy",
       statusBar: {

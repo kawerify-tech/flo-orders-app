@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "prebuildCommand": "npx expo prebuild --clean",
       "ios": {
         "resourceClass": "m-medium",
         "simulator": true,
@@ -15,12 +16,14 @@
     },
     "internal": {
       "distribution": "internal",
+      "prebuildCommand": "npx expo prebuild --clean",
       "android": {
         "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
+      "prebuildCommand": "npx expo prebuild --clean",
       "ios": {
         "resourceClass": "m-medium",
         "buildConfiguration": "Release",
@@ -31,6 +34,7 @@
     },
     "website": {
       "distribution": "internal",
+      "prebuildCommand": "npx expo prebuild --clean",
       "ios": {
         "resourceClass": "m-medium",
         "buildConfiguration": "Release",
@@ -40,6 +44,7 @@
     },
     "production": {
       "distribution": "store",
+      "prebuildCommand": "npx expo prebuild --clean",
       "android": {
         "buildType": "app-bundle"
       },
@@ -51,6 +56,7 @@
     },
     "testflight": {
       "distribution": "store",
+      "prebuildCommand": "npx expo prebuild --clean",
       "ios": {
         "resourceClass": "m-medium",
         "buildConfiguration": "Release",

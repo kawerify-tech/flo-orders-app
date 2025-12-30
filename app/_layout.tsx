@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider } from '../lib/AuthContext';
 import { NavigationGuard } from '../components/NavigationGuard';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -19,6 +20,32 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  useEffect(() => {
+    const anyGlobal = global as any;
+    const errorUtils = anyGlobal?.ErrorUtils;
+    if (!errorUtils?.setGlobalHandler) return;
+
+    const defaultHandler = errorUtils.getGlobalHandler?.();
+    errorUtils.setGlobalHandler((err: any, isFatal?: boolean) => {
+      try {
+        AsyncStorage.setItem(
+          'lastFatalJsError',
+          JSON.stringify({
+            message: String(err?.message || err || 'Unknown error'),
+            stack: String(err?.stack || ''),
+            timeIso: new Date().toISOString(),
+            isFatal: Boolean(isFatal),
+          })
+        ).catch(() => {});
+      } catch {
+        // Ignore
+      }
+      if (typeof defaultHandler === 'function') {
+        defaultHandler(err, isFatal);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (loaded) {
