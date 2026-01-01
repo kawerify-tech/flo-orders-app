@@ -8,6 +8,9 @@
       "developmentClient": true,
       "distribution": "internal",
       "prebuildCommand": "npx expo prebuild --clean",
+      "env": {
+        "NODE_ENV": "production"
+      },
       "ios": {
         "resourceClass": "m-medium",
         "simulator": true,
@@ -17,6 +20,9 @@
     "internal": {
       "distribution": "internal",
       "prebuildCommand": "npx expo prebuild --clean",
+      "env": {
+        "NODE_ENV": "production"
+      },
       "android": {
         "buildType": "apk"
       }
@@ -24,6 +30,9 @@
     "preview": {
       "distribution": "internal",
       "prebuildCommand": "npx expo prebuild --clean",
+      "env": {
+        "NODE_ENV": "production"
+      },
       "ios": {
         "resourceClass": "m-medium",
         "buildConfiguration": "Release",
@@ -35,6 +44,9 @@
     "website": {
       "distribution": "internal",
       "prebuildCommand": "npx expo prebuild --clean",
+      "env": {
+        "NODE_ENV": "production"
+      },
       "ios": {
         "resourceClass": "m-medium",
         "buildConfiguration": "Release",
@@ -45,6 +57,9 @@
     "production": {
       "distribution": "store",
       "prebuildCommand": "npx expo prebuild --clean",
+      "env": {
+        "NODE_ENV": "production"
+      },
       "android": {
         "buildType": "app-bundle"
       },
@@ -57,6 +72,9 @@
     "testflight": {
       "distribution": "store",
       "prebuildCommand": "npx expo prebuild --clean",
+      "env": {
+        "NODE_ENV": "production"
+      },
       "ios": {
         "resourceClass": "m-medium",
         "buildConfiguration": "Release",
