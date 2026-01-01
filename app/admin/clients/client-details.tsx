@@ -82,6 +82,8 @@ type Activity = Transaction | Topup | Notification;
 
 const ClientDetails = () => {
   const { clientId, clientName } = useLocalSearchParams<{ clientId: string; clientName: string }>();
+  const clientIdParam = typeof clientId === 'string' ? clientId : Array.isArray(clientId) ? clientId[0] : undefined;
+  const clientNameParam = typeof clientName === 'string' ? clientName : Array.isArray(clientName) ? clientName[0] : undefined;
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -143,10 +145,10 @@ const ClientDetails = () => {
       setLoading(true);
       
       // Load client data
-      if (clientId) {
-        await fetchClientDetails(clientId);
-      } else if (clientName) {
-        await searchClientByName(clientName);
+      if (clientIdParam) {
+        await fetchClientDetails(clientIdParam);
+      } else if (clientNameParam) {
+        await searchClientByName(clientNameParam);
       }
 
       // Load notifications
@@ -175,14 +177,14 @@ const ClientDetails = () => {
       Alert.alert('Error', 'Failed to load data');
       setLoading(false);
     }
-  }, [clientId, clientName, clientData?.id]);
+  }, [clientIdParam, clientNameParam, clientData?.id]);
 
   // Load data when component mounts or clientId/clientName changes
   React.useEffect(() => {
     loadAllData();
   }, [loadAllData]);
 
-  console.log('Route params:', { clientId, clientName });
+  console.log('Route params:', { clientId: clientIdParam, clientName: clientNameParam });
 
   const fetchClientDetails: FetchClientDetails = async (id: string) => {
     try {
@@ -332,17 +334,17 @@ const ClientDetails = () => {
   };
 
   useEffect(() => {
-    console.log('useEffect triggered with:', { clientId, clientName });
+    console.log('useEffect triggered with:', { clientId: clientIdParam, clientName: clientNameParam });
     const initializeClient = async () => {
       console.log('Starting client initialization');
       try {
         setLoading(true);
-        if (clientId) {
-          console.log('Fetching client by ID:', clientId);
-          await fetchClientDetails(clientId);
-        } else if (clientName) {
-          console.log('Searching client by name:', clientName);
-          await searchClientByName(clientName);
+        if (clientIdParam) {
+          console.log('Fetching client by ID:', clientIdParam);
+          await fetchClientDetails(clientIdParam);
+        } else if (clientNameParam) {
+          console.log('Searching client by name:', clientNameParam);
+          await searchClientByName(clientNameParam);
         } else {
           console.log('No client identifier provided');
           Alert.alert('Error', 'No client identifier provided');
@@ -358,7 +360,7 @@ const ClientDetails = () => {
     };
 
     initializeClient();
-  }, [clientId, clientName]);
+  }, [clientIdParam, clientNameParam]);
 
   // Add real-time listener for transactions
   useEffect(() => {
@@ -394,7 +396,8 @@ const ClientDetails = () => {
   const formatTimestamp = (timestamp: any) => {
     if (!timestamp) return 'N/A';
     try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+      if (Number.isNaN(date.getTime())) return 'Invalid Date';
       return format(date, 'yyyy-MM-dd HH:mm:ss');
     } catch (error) {
       console.error('Error formatting timestamp:', error);
@@ -415,16 +418,18 @@ const ClientDetails = () => {
         });
         break;
       case 'amount':
-        sorted.sort((a, b) => 
-          sortOrder === 'asc' ? a.amount - b.amount : b.amount - a.amount
-        );
+        sorted.sort((a, b) => {
+          const amountA = Number((a as any)?.amount || 0);
+          const amountB = Number((b as any)?.amount || 0);
+          return sortOrder === 'asc' ? amountA - amountB : amountB - amountA;
+        });
         break;
       case 'status':
-        sorted.sort((a, b) => 
-          sortOrder === 'asc' 
-            ? a.status.localeCompare(b.status)
-            : b.status.localeCompare(a.status)
-        );
+        sorted.sort((a, b) => {
+          const statusA = String((a as any)?.status || '');
+          const statusB = String((b as any)?.status || '');
+          return sortOrder === 'asc' ? statusA.localeCompare(statusB) : statusB.localeCompare(statusA);
+        });
         break;
     }
 
@@ -477,18 +482,18 @@ const ClientDetails = () => {
         });
         break;
       case 'type':
-        sorted.sort((a, b) => 
-          notificationSortOrder === 'asc' 
-            ? a.type.localeCompare(b.type)
-            : b.type.localeCompare(a.type)
-        );
+        sorted.sort((a, b) => {
+          const typeA = String((a as any)?.type || '');
+          const typeB = String((b as any)?.type || '');
+          return notificationSortOrder === 'asc' ? typeA.localeCompare(typeB) : typeB.localeCompare(typeA);
+        });
         break;
       case 'status':
-        sorted.sort((a, b) => 
-          notificationSortOrder === 'asc' 
-            ? a.status.localeCompare(b.status)
-            : b.status.localeCompare(a.status)
-        );
+        sorted.sort((a, b) => {
+          const statusA = String((a as any)?.status || '');
+          const statusB = String((b as any)?.status || '');
+          return notificationSortOrder === 'asc' ? statusA.localeCompare(statusB) : statusB.localeCompare(statusA);
+        });
         break;
     }
 
@@ -530,16 +535,18 @@ const ClientDetails = () => {
         });
         break;
       case 'amount':
-        sorted.sort((a, b) => 
-          topupSortOrder === 'asc' ? a.amount - b.amount : b.amount - a.amount
-        );
+        sorted.sort((a, b) => {
+          const amountA = Number((a as any)?.amount || 0);
+          const amountB = Number((b as any)?.amount || 0);
+          return topupSortOrder === 'asc' ? amountA - amountB : amountB - amountA;
+        });
         break;
       case 'status':
-        sorted.sort((a, b) => 
-          topupSortOrder === 'asc' 
-            ? a.status.localeCompare(b.status)
-            : b.status.localeCompare(a.status)
-        );
+        sorted.sort((a, b) => {
+          const statusA = String((a as any)?.status || '');
+          const statusB = String((b as any)?.status || '');
+          return topupSortOrder === 'asc' ? statusA.localeCompare(statusB) : statusB.localeCompare(statusA);
+        });
         break;
     }
 
@@ -552,8 +559,8 @@ const ClientDetails = () => {
       setFilteredTransactions(transactions);
     } else {
       const filtered = transactions.filter(transaction =>
-        transaction.vehicle.toLowerCase().includes(text.toLowerCase()) ||
-        transaction.fuelType.toLowerCase().includes(text.toLowerCase()) ||
+        String((transaction as any)?.vehicle || '').toLowerCase().includes(text.toLowerCase()) ||
+        String((transaction as any)?.fuelType || '').toLowerCase().includes(text.toLowerCase()) ||
         formatTimestamp(transaction.timestamp)
           .toLowerCase()
           .includes(text.toLowerCase())

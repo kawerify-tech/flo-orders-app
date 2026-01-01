@@ -5,7 +5,7 @@ module.exports = {
     version: "1.0.0",
     scheme: "floorders",
     platforms: ["ios", "android"],
-    newArchEnabled: true,
+    newArchEnabled: false,
     orientation: "default",
     icon: "./assets/images/favicon.png",
     userInterfaceStyle: "automatic",
@@ -19,7 +19,7 @@ module.exports = {
     ],
     android: {
       package: "com.floorders.floorders",
-      versionCode: 5,
+      versionCode: 6,
       icon: "./assets/images/favicon.png",
       adaptiveIcon: {
         foregroundImage: "./assets/images/favicon.png",
@@ -36,7 +36,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.floorders",
-      buildNumber: "5",
+      buildNumber: "6",
       googleServicesFile: "./app/GoogleService-Info.plist",
       deploymentTarget: "15.1",
       requireFullScreen: false,
