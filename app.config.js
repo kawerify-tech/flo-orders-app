@@ -5,7 +5,7 @@ module.exports = {
     version: "1.0.0",
     scheme: "floorders",
     platforms: ["ios", "android"],
-    newArchEnabled: false,
+    newArchEnabled: true,
     orientation: "default",
     icon: "./assets/images/favicon.png",
     userInterfaceStyle: "automatic",
