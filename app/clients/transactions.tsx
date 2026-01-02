@@ -520,7 +520,7 @@ const handleCreateTransaction = async () => {
 
     try {
       const draftId = `DRAFT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const now = new Date();
+      const now = Timestamp.now();
 
       const draftData = {
         id: draftId,
@@ -547,7 +547,7 @@ const handleCreateTransaction = async () => {
         },
         processingSteps: [{
           step: 'draft_created',
-          timestamp: now.toISOString(),
+          timestamp: now.toDate().toISOString(),
           status: 'completed'
         }]
       };
@@ -581,25 +581,23 @@ const handleCreateTransaction = async () => {
     setLastError(null);
 
     try {
+      if (!clientData?.id || !currentUser?.email) {
+        showUserError('Please sign in again.');
+        return;
+      }
+
       const transactionId = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const now = Timestamp.now();
 
-      // Remove the draft from local state first to prevent duplicates
-      setDraftTransactions(prev => prev.filter(d => d.id !== draft.id));
-
-      const transactionData: Transaction = {
+      const transactionData = {
         ...draft,
         id: transactionId,
         isDraft: false,
-        timestamp: {
-          seconds: now.seconds,
-          nanoseconds: now.nanoseconds,
-          toDate: () => now.toDate()
-        },
-        createdAt: now.toDate(),
-        updatedAt: now.toDate(),
+        timestamp: now,
+        createdAt: now,
+        updatedAt: now,
         processingSteps: [
-          ...draft.processingSteps,
+          ...(draft.processingSteps || []),
           {
             step: 'draft_sent',
             timestamp: now.toDate().toISOString(),
@@ -608,16 +606,30 @@ const handleCreateTransaction = async () => {
         ]
       };
 
-      // Delete the draft first
-      const draftRef = doc(db, `clients/${clientData?.id}/drafts/${draft.id}`);
-      await deleteDoc(draftRef);
+      const batch = writeBatch(db);
+      const draftRef = doc(db, `clients/${clientData.id}/drafts/${draft.id}`);
+      const transactionRef = doc(db, 'transactions', transactionId);
+      const clientTransactionRef = doc(db, `clients/${clientData.id}/transactions/${transactionId}`);
+      const clientNotificationRef = doc(db, 'clients', clientData.id, 'notifications', transactionId);
 
-      // Then create the new transaction
-      const clientTransactionRef = doc(db, 
-        `clients/${clientData?.id}/transactions/${transactionId}`);
-      
-      await setDoc(clientTransactionRef, transactionData);
+      batch.delete(draftRef);
+      batch.set(transactionRef, transactionData);
+      batch.set(clientTransactionRef, transactionData);
+      batch.set(clientNotificationRef, {
+        message: `Transaction pending: $${Number(draft.amount).toFixed(2)} (${draft.fuelType})`,
+        createdAt: serverTimestamp(),
+        type: 'transaction',
+        status: 'pending',
+        transactionId,
+        amount: Number(draft.amount),
+        litres: Number(draft.litres),
+        fuelType: draft.fuelType,
+        read: false,
+      });
 
+      await batch.commit();
+
+      setDraftTransactions(prev => prev.filter(d => d.id !== draft.id));
       showUserSuccess('Transaction created successfully');
 
     } catch (error) {
@@ -707,6 +719,7 @@ const handleCreateTransaction = async () => {
             setSelectedAttendant(selected || null);
           }}
           style={styles.picker}
+          dropdownIconColor="#333333"
         >
           <Picker.Item label="Select an attendant" value="" />
           {attendants.map((attendant) => (
@@ -729,6 +742,7 @@ const handleCreateTransaction = async () => {
           selectedValue={selectedFuelType}
           onValueChange={(itemValue) => setSelectedFuelType(itemValue)}
           style={styles.picker}
+          dropdownIconColor="#333333"
         >
           <Picker.Item label="Diesel" value="diesel" />
           <Picker.Item label="Blend" value="blend" />
@@ -745,6 +759,7 @@ const handleCreateTransaction = async () => {
           selectedValue={selectedVehicle}
           onValueChange={(itemValue) => setSelectedVehicle(itemValue)}
           style={styles.picker}
+          dropdownIconColor="#333333"
         >
           <Picker.Item label="Select a vehicle" value="" />
           {clientData && clientData.vehicle && Array.isArray(clientData.vehicle) ? (
@@ -798,7 +813,11 @@ const handleCreateTransaction = async () => {
                 ${draft.amount.toFixed(2)} @ ${draft.pumpPrice.toFixed(2)}/L
               </Text>
               <Text style={styles.draftDate}>
-                {format(draft.lastModified.toDate(), 'MMM d, yyyy HH:mm')}
+                {(() => {
+                  const lm: any = (draft as any).lastModified;
+                  const date: Date = lm?.toDate?.() ?? (lm instanceof Date ? lm : new Date());
+                  return format(date, 'MMM d, yyyy HH:mm');
+                })()}
               </Text>
             </View>
             <View style={styles.draftActions}>
@@ -1145,6 +1164,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
     fontSize: 16,
+    color: '#333333',
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
@@ -1333,6 +1353,7 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
     width: '100%',
+    color: '#333333',
   },
   pickerLabel: {
     fontSize: 14,

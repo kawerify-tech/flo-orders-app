@@ -105,6 +105,7 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   scene: {
+    flex: 1,
     backgroundColor: '#F5F5F5',
   },
   tabBar: {

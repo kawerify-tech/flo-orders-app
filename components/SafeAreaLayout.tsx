@@ -16,7 +16,7 @@ export const SafeAreaLayout: React.FC<SafeAreaLayoutProps> = ({
   children,
   style,
   contentStyle,
-  edges = ['top', 'bottom', 'left', 'right'],
+  edges = Platform.OS === 'android' ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right'],
   statusBarStyle = 'auto'
 }) => {
   const colors = useThemeColors();

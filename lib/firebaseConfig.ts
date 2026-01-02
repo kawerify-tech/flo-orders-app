@@ -1,6 +1,6 @@
 // firebaseConfig.ts
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { createUserWithEmailAndPassword, getAuth, initializeAuth } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth, getReactNativePersistence, initializeAuth } from 'firebase/auth';
 import { getFirestore, setLogLevel, collection, getDocs, addDoc, updateDoc, query, where, orderBy, limit, startAfter, doc, runTransaction } from 'firebase/firestore';
 import { getDatabase, ref, onValue, push, set, serverTimestamp, update, onDisconnect, get, child } from 'firebase/database';
 import { Platform } from 'react-native';
@@ -35,28 +35,37 @@ try {
 
 const globalForFirebase = globalThis as unknown as {
   __flo_firebase_auth__?: ReturnType<typeof getAuth>;
+  __flo_firebase_auth_by_app__?: Record<string, ReturnType<typeof getAuth>>;
+};
+
+const getOrInitAuth = (targetApp: typeof app) => {
+  globalForFirebase.__flo_firebase_auth_by_app__ ??= {};
+  const key = targetApp.name;
+  const existing = globalForFirebase.__flo_firebase_auth_by_app__[key];
+  if (existing) return existing;
+
+  let instance: ReturnType<typeof getAuth>;
+  if (Platform.OS === 'web') {
+    instance = getAuth(targetApp);
+  } else {
+    try {
+      instance = initializeAuth(targetApp, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
+    } catch {
+      // If already initialized (fast refresh) or RN bundle not available, fall back.
+      instance = getAuth(targetApp);
+    }
+  }
+
+  globalForFirebase.__flo_firebase_auth_by_app__[key] = instance;
+  if (key === app.name) globalForFirebase.__flo_firebase_auth__ = instance;
+  return instance;
 };
 
 const auth = (() => {
   if (globalForFirebase.__flo_firebase_auth__) return globalForFirebase.__flo_firebase_auth__;
-
-  // React Native must initialize Auth with persistence.
-  // If auth was already initialized (fast refresh), initializeAuth can throw; fall back to getAuth.
-  let instance: ReturnType<typeof getAuth>;
-  if (Platform.OS === 'web') {
-    instance = getAuth(app);
-  } else {
-    try {
-      // Best-effort: initialize Auth for React Native. Some Firebase builds do not
-      // expose the react-native persistence entrypoint; in that case we fall back.
-      instance = initializeAuth(app);
-    } catch {
-      instance = getAuth(app);
-    }
-  }
-
-  globalForFirebase.__flo_firebase_auth__ = instance;
-  return instance;
+  return getOrInitAuth(app);
 })();
 let messaging: any = null;
 let getToken: any = null;
@@ -82,7 +91,7 @@ const getSecondaryApp = () => {
 };
 
 const getSecondaryAuth = () => {
-  return getAuth(getSecondaryApp());
+  return getOrInitAuth(getSecondaryApp());
 };
 
 // Helper functions for Realtime Database

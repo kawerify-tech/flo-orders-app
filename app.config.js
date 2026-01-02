@@ -8,7 +8,7 @@ module.exports = {
     newArchEnabled: true,
     orientation: "default",
     icon: "./assets/images/favicon.png",
-    userInterfaceStyle: "automatic",
+    userInterfaceStyle: "light",
     splash: {
       image: "./assets/images/flo-logo.png",
       resizeMode: "contain",

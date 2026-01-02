@@ -13,11 +13,12 @@ module.exports = (() => {
     ...resolver,
     assetExts: resolver.assetExts.filter((ext) => ext !== "svg"),
     sourceExts: [...resolver.sourceExts, "svg", "cjs"],
+    resolverMainFields: ["react-native", "browser", "main"],
     alias: {
       ...resolver.alias,
       'tslib': require.resolve('tslib')
     },
-    unstable_enablePackageExports: true,
+    unstable_enablePackageExports: false,
   };
 
   return config;

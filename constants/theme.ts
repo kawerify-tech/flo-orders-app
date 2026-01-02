@@ -43,8 +43,7 @@ export const colors = lightColors; // Default to light colors
 
 // Hook to get colors based on color scheme
 export function useThemeColors() {
-  const colorScheme = useColorScheme();
-  return colorScheme === 'dark' ? darkColors : lightColors;
+  return lightColors;
 }
 
 // Responsive Sizes

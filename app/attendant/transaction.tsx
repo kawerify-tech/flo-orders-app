@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, ScrollView } from 'react-native';
-import { collection, query, orderBy, getDocs, updateDoc, doc, Timestamp, getDoc, increment } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, updateDoc, doc, Timestamp, getDoc, increment, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaLayout } from '../../components/SafeAreaLayout';
@@ -198,12 +198,18 @@ const TransactionScreen: React.FC = () => {
     }
 
     const query = searchQuery.toLowerCase();
-    const filtered = allTransactions.filter(transaction => 
-      transaction.clientName.toLowerCase().includes(query) ||
-      transaction.clientEmail.toLowerCase().includes(query) ||
-      transaction.vehicle.toLowerCase().includes(query) ||
-      transaction.id.toLowerCase().includes(query)
-    );
+    const filtered = allTransactions.filter((transaction) => {
+      const clientName = String(transaction.clientName || '').toLowerCase();
+      const clientEmail = String(transaction.clientEmail || '').toLowerCase();
+      const vehicle = String(transaction.vehicle || '').toLowerCase();
+      const id = String(transaction.id || '').toLowerCase();
+      return (
+        clientName.includes(query) ||
+        clientEmail.includes(query) ||
+        vehicle.includes(query) ||
+        id.includes(query)
+      );
+    });
     
     setFilteredTransactions(filtered);
   }, [searchQuery, allTransactions]);
@@ -280,6 +286,13 @@ const TransactionScreen: React.FC = () => {
       const attendantId = currentUser.uid;
       const attendantName = currentUser.displayName || 'Station Attendant';
       const now = Timestamp.now();
+      const approvalStep = {
+        step: 'approved',
+        timestamp: now,
+        status: 'completed',
+        attendantId,
+        attendantName,
+      };
 
       // Update the main transaction status
       const transactionRef = doc(db, 'transactions', transaction.id);
@@ -289,16 +302,7 @@ const TransactionScreen: React.FC = () => {
         attendantId,
         attendantName,
         processedAt: now,
-        processingSteps: [
-          ...(transaction.processingSteps || []),
-          {
-            step: 'approved',
-            timestamp: now,
-            status: 'completed',
-            attendantId,
-            attendantName
-          }
-        ]
+        processingSteps: arrayUnion(approvalStep)
       });
 
       // Update client's transaction copy
@@ -312,16 +316,7 @@ const TransactionScreen: React.FC = () => {
             attendantId,
             attendantName,
             processedAt: now,
-            processingSteps: [
-              ...(transaction.processingSteps || []),
-              {
-                step: 'approved',
-                timestamp: now,
-                status: 'completed',
-                attendantId,
-                attendantName,
-              },
-            ],
+            processingSteps: arrayUnion(approvalStep),
           });
         }
       } catch (error) {
@@ -333,10 +328,11 @@ const TransactionScreen: React.FC = () => {
       // Best-effort: update client's balance (do not block approval UI)
       try {
         const clientDocId = transaction.clientId;
-        if (clientDocId) {
+        const amount = Number(transaction.amount);
+        if (clientDocId && Number.isFinite(amount) && amount > 0) {
           const clientRef = doc(db, 'clients', clientDocId);
           await updateDoc(clientRef, {
-            balance: increment(-transaction.amount),
+            balance: increment(-amount),
           });
         }
       } catch (error) {
@@ -346,7 +342,9 @@ const TransactionScreen: React.FC = () => {
       }
 
       // Best-effort: refresh UI
-      await refreshTransactions();
+      try {
+        await refreshTransactions();
+      } catch {}
 
       showUserSuccess('Transaction approved successfully');
     } catch (error) {
@@ -369,6 +367,13 @@ const TransactionScreen: React.FC = () => {
       const attendantId = currentUser.uid;
       const attendantName = currentUser.displayName || 'Station Attendant';
       const now = Timestamp.now();
+      const rejectionStep = {
+        step: 'rejected',
+        timestamp: now,
+        status: 'rejected',
+        attendantId,
+        attendantName,
+      };
 
       // Update the main transaction status
       const transactionRef = doc(db, 'transactions', transaction.id);
@@ -378,16 +383,7 @@ const TransactionScreen: React.FC = () => {
         attendantId,
         attendantName,
         processedAt: now,
-        processingSteps: [
-          ...(transaction.processingSteps || []),
-          {
-            step: 'rejected',
-            timestamp: now,
-            status: 'rejected',
-            attendantId,
-            attendantName
-          }
-        ]
+        processingSteps: arrayUnion(rejectionStep)
       });
 
       // Update client's transaction copy
@@ -401,16 +397,7 @@ const TransactionScreen: React.FC = () => {
             attendantId,
             attendantName,
             processedAt: now,
-            processingSteps: [
-              ...(transaction.processingSteps || []),
-              {
-                step: 'rejected',
-                timestamp: now,
-                status: 'rejected',
-                attendantId,
-                attendantName,
-              },
-            ],
+            processingSteps: arrayUnion(rejectionStep),
           });
         }
       } catch (error) {
@@ -420,7 +407,9 @@ const TransactionScreen: React.FC = () => {
       }
 
       // Best-effort: refresh UI
-      await refreshTransactions();
+      try {
+        await refreshTransactions();
+      } catch {}
 
       showUserSuccess('Transaction rejected successfully');
     } catch (error) {
@@ -440,7 +429,13 @@ const TransactionScreen: React.FC = () => {
       <View style={styles.transactionHeader}>
         <Text style={styles.clientName} numberOfLines={1} ellipsizeMode="tail">{item.clientName}</Text>
         <Text style={styles.timestamp} numberOfLines={1} ellipsizeMode="tail">
-          {item.timestamp.toDate().toLocaleString()}
+          {(() => {
+            try {
+              return item.timestamp?.toDate?.().toLocaleString() ?? '';
+            } catch {
+              return '';
+            }
+          })()}
         </Text>
       </View>
 
@@ -1080,6 +1075,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     padding: 12,
     borderRadius: 8,
+    color: '#333333',
     borderWidth: 1,
     borderColor: '#DDDDDD',
     fontSize: 16,
