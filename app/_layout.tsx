@@ -1,9 +1,8 @@
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, StatusBar, View } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,6 +10,25 @@ import { AuthProvider } from '../lib/AuthContext';
 import { NavigationGuard } from '../components/NavigationGuard';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useThemeColors } from '../constants/theme';
+
+const getStatusBarStyleForBackground = (backgroundColor: unknown) => {
+  const hex = typeof backgroundColor === 'string' ? backgroundColor.trim() : '';
+  const hexMatch = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+  if (!hexMatch) return 'auto' as const;
+
+  const raw = hexMatch[1];
+  const full = raw.length === 3 ? raw.split('').map(ch => ch + ch).join('') : raw;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? ('dark' as const) : ('light' as const);
+};
+
+const getBarStyle = (backgroundColor: unknown): 'light-content' | 'dark-content' => {
+  const styleChoice = getStatusBarStyleForBackground(backgroundColor);
+  return styleChoice === 'light' ? 'light-content' : 'dark-content';
+};
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync().catch(err => {
@@ -75,7 +93,11 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <AuthProvider>
             <NavigationGuard />
-            <StatusBar style="auto" backgroundColor={colors.background} translucent={false} />
+            <StatusBar
+              barStyle={getBarStyle(colors.background)}
+              backgroundColor={colors.background}
+              translucent={false}
+            />
             <Stack>
               <Stack.Screen name="terms-acceptance" options={{ headerShown: false }} />
               <Stack.Screen name="legal/user-agreement" options={{ headerShown: false }} />

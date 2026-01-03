@@ -25,11 +25,15 @@ module.exports = {
         foregroundImage: "./assets/images/favicon.png",
         backgroundColor: "#ffffff"
       },
+      permissions: [
+        "INTERNET",
+        "VIBRATE"
+      ],
       googleServicesFile: "./app/google-services.json",
       // Privacy Policy URL - REQUIRED for Google Play Store submission
       privacy: "https://kawerifytech.com/privacy-policy",
       statusBar: {
-        barStyle: "default",
+        barStyle: "dark-content",
         backgroundColor: "#ffffff"
       }
     },

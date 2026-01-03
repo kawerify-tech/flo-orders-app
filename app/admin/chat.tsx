@@ -4,6 +4,7 @@ import {
   TouchableOpacity, Platform, KeyboardAvoidingView, Alert
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   auth, database, getChatRef, getMessagesRef,
   getStatusRef, getUserRef, ref, onValue, push,
@@ -25,6 +26,39 @@ interface Props {
   attendantId: string;
   attendantName: string;
 }
+
+const chatCacheKey = (chatId: string) => `chat_cache:${chatId}`;
+
+const safeParseMessages = (raw: string | null): Message[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(Boolean)
+      .map((m: any) => ({
+        id: String(m?.id || ''),
+        text: String(m?.text || ''),
+        senderId: String(m?.senderId || ''),
+        senderName: String(m?.senderName || ''),
+        timestamp: Number(m?.timestamp || 0),
+        status: (m?.status as Message['status']) || 'sent',
+        type: (m?.type as Message['type']) || 'text',
+      }))
+      .filter(m => m.id && m.senderId);
+  } catch {
+    return [];
+  }
+};
+
+const persistMessages = async (chatId: string, next: Message[]) => {
+  try {
+    const trimmed = next.slice(-500);
+    await AsyncStorage.setItem(chatCacheKey(chatId), JSON.stringify(trimmed));
+  } catch {
+    // ignore
+  }
+};
 
 const AdminChat: React.FC<Props> = ({ attendantId, attendantName }) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -97,6 +131,20 @@ const AdminChat: React.FC<Props> = ({ attendantId, attendantName }) => {
     const messagesRef = getMessagesRef(chatId);
     const attendantStatusRef = getStatusRef(attendantId);
 
+    let isMounted = true;
+
+    (async () => {
+      try {
+        const cached = await AsyncStorage.getItem(chatCacheKey(chatId));
+        const parsed = safeParseMessages(cached);
+        if (isMounted && parsed.length) {
+          setMessages(parsed.sort((a, b) => a.timestamp - b.timestamp));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+
     const statusUnsub = onValue(attendantStatusRef, snapshot => {
       const status = snapshot.val();
       setIsOnline(status?.status === 'online');
@@ -118,6 +166,7 @@ const AdminChat: React.FC<Props> = ({ attendantId, attendantName }) => {
       });
       const sortedMessages = msgList.sort((a, b) => a.timestamp - b.timestamp);
       setMessages(sortedMessages);
+      persistMessages(chatId, sortedMessages);
 
       // Mark received messages as read
       sortedMessages.forEach(message => {
@@ -129,6 +178,7 @@ const AdminChat: React.FC<Props> = ({ attendantId, attendantName }) => {
     });
 
     return () => {
+      isMounted = false;
       statusUnsub();
       messageUnsub();
     };
@@ -150,6 +200,14 @@ const AdminChat: React.FC<Props> = ({ attendantId, attendantName }) => {
         status: 'sent',
         type: 'text'
       };
+
+      setMessages(prev => {
+        const next = [...prev, { id: `local_${Date.now()}`, ...(messageData as any) } as Message].sort(
+          (a, b) => a.timestamp - b.timestamp
+        );
+        persistMessages(chatId, next);
+        return next;
+      });
 
       const chatSnapshot = await get(chatRef);
       if (!chatSnapshot.exists()) {

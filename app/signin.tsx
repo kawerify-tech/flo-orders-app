@@ -11,6 +11,7 @@ import { useBreakpoint } from '../constants/breakpoints';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDeviceInfo, getIPAddress } from '../utils/deviceTracking';
 import { useAuth } from '../lib/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SignInScreen = () => {
   const [email, setEmail] = useState('');
@@ -20,6 +21,7 @@ const SignInScreen = () => {
   const router = useRouter();
   const breakpoint = useBreakpoint();
   const { user, userRole } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // Prevent back button from going back when signed in
   useEffect(() => {
@@ -342,7 +344,15 @@ const SignInScreen = () => {
           <View style={styles.buttonBottomSpacer} />
         </View>
 
-        <View style={styles.footer}>
+        <View
+          style={[
+            styles.footer,
+            {
+              paddingBottom:
+                responsive.spacing.lg + insets.bottom + (Platform.OS === 'android' && insets.bottom === 0 ? 24 : 0),
+            },
+          ]}
+        >
           <TouchableOpacity
             onPress={() => Linking.openURL('https://kawerifytech.com')}
             accessibilityRole="link"
